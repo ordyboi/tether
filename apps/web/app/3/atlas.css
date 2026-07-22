@@ -1,0 +1,46 @@
+/* Atlas direction — Leaflet chrome overrides to keep the native, minimal feel */
+
+.atlas-map .leaflet-control-zoom {
+  border: none !important;
+  border-radius: 9999px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14) !important;
+}
+
+.atlas-map .leaflet-control-zoom a {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #171717 !important;
+  border: none !important;
+  width: 34px !important;
+  height: 34px !important;
+  line-height: 34px !important;
+}
+
+.atlas-map .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(10px);
+  border-radius: 8px 0 0 0;
+  font-size: 9px !important;
+  color: #737373 !important;
+}
+
+.atlas-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+@keyframes atlas-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.atlas-live-ring {
+  animation: atlas-pulse 2.4s ease-in-out infinite;
+}
