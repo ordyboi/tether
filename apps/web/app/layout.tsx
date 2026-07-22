@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
+import NavStrip from "./_components/NavStrip";
 
 export const metadata: Metadata = {
-  title: "Tether — Design Directions",
-  description: "Phase 0 prototype: three design directions for Tether.",
+  title: "Tether",
+  description: "See where your crew is, on one shared live map.",
 };
 
 export default function RootLayout({
@@ -13,7 +15,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body
+        className="min-h-full w-full bg-[#1b140c] text-amber-50"
+        style={{
+          fontFamily:
+            '"Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif',
+        }}
+      >
+        <div className="relative mx-auto flex h-screen max-w-3xl flex-col overflow-hidden">
+          <main className="flex-1 overflow-y-auto">{children}</main>
+          <NavStrip />
+        </div>
+      </body>
     </html>
   );
 }

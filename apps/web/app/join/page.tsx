@@ -44,7 +44,7 @@ export default function JoinRoomPage() {
 
       <button
         disabled={!displayName.trim()}
-        onClick={() => router.push("/1/room")}
+        onClick={() => router.push("/room")}
         className="flex w-full items-center justify-center gap-2 rounded-full border-[3px] border-blue-500 bg-blue-500 py-4 text-base font-extrabold text-white shadow-[0_4px_0_0_#1d4ed8] transition active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:border-stone-600 disabled:bg-stone-700 disabled:text-stone-400 disabled:shadow-none"
       >
         <LogIn size={20} strokeWidth={2.5} />

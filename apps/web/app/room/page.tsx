@@ -84,7 +84,7 @@ export default function RoomPage() {
                 : "Exact"}
           </button>
           <Link
-            href="/1/room/share"
+            href="/room/share"
             className="flex items-center gap-1 rounded-full border-2 border-orange-600 bg-orange-500 px-2.5 py-1.5 text-xs font-extrabold text-white"
           >
             <Share2 size={14} strokeWidth={2.5} />

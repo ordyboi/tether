@@ -60,7 +60,7 @@ export default function RoomMap({
   focusTarget: { lat: number; lng: number; zoom?: number } | null;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative isolate h-full w-full overflow-hidden">
       <style>{`
         @keyframes trailhead-pulse {
           0% { transform: scale(0.9); opacity: 0.45; }

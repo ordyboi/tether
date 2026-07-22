@@ -71,7 +71,7 @@ export default function CreateRoomPage() {
 
       <button
         disabled={!name.trim()}
-        onClick={() => router.push("/1/room")}
+        onClick={() => router.push("/room")}
         className="flex w-full items-center justify-center gap-2 rounded-full border-[3px] border-green-600 bg-green-500 py-4 text-base font-extrabold text-white shadow-[0_4px_0_0_#15803d] transition active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:border-stone-600 disabled:bg-stone-700 disabled:text-stone-400 disabled:shadow-none"
       >
         <Rocket size={20} strokeWidth={2.5} />

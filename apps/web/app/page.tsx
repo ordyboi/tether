@@ -1,64 +1,69 @@
 import Link from "next/link";
+import { ArrowRight, Sparkles, DoorOpen, Users } from "lucide-react";
+import { mockRoom, mockMembers } from "@/lib/mock-data";
 
-const directions = [
-  {
-    href: "/1",
-    name: "Trailhead",
-    tagline: "Warm, playful, illustrated",
-    description:
-      "Bright, rounded, emoji-forward. Leans into the fun of a group hangout — friendly colour, big touch targets, characterful markers.",
-  },
-  {
-    href: "/2",
-    name: "Transit",
-    tagline: "Structured, utilitarian, data-dense",
-    description:
-      "Card-based bottom sheets, clear hierarchy, dark-mode-first. Optimised for scanning a roster fast and trusting the numbers.",
-  },
-  {
-    href: "/3",
-    name: "Atlas",
-    tagline: "Minimal, native, translucent",
-    description:
-      "Full-bleed map, frosted glass chrome, restrained colour. Feels like it ships in the OS rather than sitting on top of it.",
-  },
-];
-
-export default function Home() {
+export default function TrailheadHome() {
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100 px-6 py-16">
-      <div className="mx-auto max-w-3xl">
-        <p className="text-sm uppercase tracking-widest text-neutral-500 mb-3">
-          Tether · Phase 0
-        </p>
-        <h1 className="text-3xl font-semibold mb-2">Design directions</h1>
-        <p className="text-neutral-400 mb-12 max-w-xl">
-          Three independent takes on the same product, built against the same
-          mocked room and roster. Open each, walk the journey, then pick one
-          to refine into the real design system.
-        </p>
+    <div className="px-5 pt-10 pb-32">
+      <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-orange-400">
+        Trailhead
+      </p>
+      <h1 className="mb-2 text-3xl font-extrabold text-amber-50">
+        Where's everyone?
+      </h1>
+      <p className="mb-8 max-w-sm text-amber-200/60">
+        Tether keeps your crew on one map — share a link, appear together,
+        gone whenever you leave.
+      </p>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          {directions.map((d) => (
-            <Link
-              key={d.href}
-              href={d.href}
-              className="group rounded-2xl border border-neutral-800 bg-neutral-900 p-6 transition hover:border-neutral-600 hover:bg-neutral-850"
-            >
-              <div className="text-xs font-mono text-neutral-500 mb-4">
-                {d.href}
-              </div>
-              <h2 className="text-xl font-semibold mb-1 group-hover:text-white">
-                {d.name}
-              </h2>
-              <p className="text-sm text-neutral-400 mb-3">{d.tagline}</p>
-              <p className="text-sm text-neutral-500 leading-relaxed">
-                {d.description}
-              </p>
-            </Link>
-          ))}
+      <Link
+        href="/room"
+        className="group mb-6 block rounded-3xl border-[3px] border-[#4a3420] bg-[#2a1d10] p-5 shadow-[0_5px_0_0_#150d06] transition active:translate-y-1 active:shadow-none"
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-[3px] border-orange-500 bg-[#1b140c] text-3xl">
+            {mockRoom.emoji}
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-extrabold text-amber-50">
+              {mockRoom.name}
+            </h2>
+            <p className="flex items-center gap-1 text-sm font-bold text-amber-200/50">
+              <Users size={14} /> {mockMembers.length} members active
+            </p>
+          </div>
+          <ArrowRight
+            className="text-orange-400 transition group-hover:translate-x-1"
+            size={22}
+          />
         </div>
+        <div className="mt-4 flex items-center justify-center gap-2 rounded-full border-[3px] border-orange-600 bg-orange-500 py-3 text-sm font-extrabold text-white shadow-[0_4px_0_0_#9a3412]">
+          Enter room
+        </div>
+      </Link>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          href="/create"
+          className="flex flex-col items-center gap-2 rounded-3xl border-[3px] border-[#4a3420] bg-[#2a1d10] px-4 py-5 text-center shadow-[0_4px_0_0_#150d06] transition active:translate-y-1 active:shadow-none"
+        >
+          <Sparkles className="text-green-400" size={26} strokeWidth={2.5} />
+          <span className="text-sm font-extrabold text-amber-50">
+            Create a room
+          </span>
+          <span className="text-xs text-amber-200/50">Start something new</span>
+        </Link>
+        <Link
+          href="/join"
+          className="flex flex-col items-center gap-2 rounded-3xl border-[3px] border-[#4a3420] bg-[#2a1d10] px-4 py-5 text-center shadow-[0_4px_0_0_#150d06] transition active:translate-y-1 active:shadow-none"
+        >
+          <DoorOpen className="text-blue-400" size={26} strokeWidth={2.5} />
+          <span className="text-sm font-extrabold text-amber-50">
+            Join with invite
+          </span>
+          <span className="text-xs text-amber-200/50">Got a link? Hop in</span>
+        </Link>
       </div>
-    </main>
+    </div>
   );
 }
