@@ -1,10 +1,12 @@
 "use client";
 
-import { Fragment, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
+import { useRef } from "react";
 import L from "leaflet";
 import type { MockMember } from "@/lib/mock-data";
 import { staleness } from "@/lib/mock-data";
+import { useLeafletMap } from "@/app/_lib/use-leaflet-map";
+import { useFlyTo } from "@/app/_lib/use-fly-to";
+import { useMapMarkers } from "@/app/_lib/use-map-markers";
 
 function buildDivIcon(member: MockMember, isSelected: boolean) {
   const stale = staleness(member.lastUpdateSecondsAgo);
@@ -59,6 +61,12 @@ export default function RoomMap({
   onSelectMember: (id: string) => void;
   focusTarget: { lat: number; lng: number; zoom?: number } | null;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useLeafletMap(containerRef, center, 15);
+
+  useFlyTo(mapRef, focusTarget);
+  useMapMarkers(mapRef, members, selectedId, onSelectMember, buildDivIcon);
+
   return (
     <div className="relative isolate h-full w-full overflow-hidden">
       <style>{`
@@ -69,59 +77,7 @@ export default function RoomMap({
         }
         .leaflet-container { background: #241a0f; font-family: inherit; }
       `}</style>
-      <MapContainer
-        center={[center.lat, center.lng]}
-        zoom={15}
-        scrollWheelZoom
-        className="h-full w-full"
-      >
-        <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <FlyTo target={focusTarget} />
-        {members.map((m) => {
-          if (m.sharingState === "ghost") return null;
-          return (
-            <Fragment key={m.id}>
-              {m.sharingState === "approx" && m.blurRadiusM && (
-                <Circle
-                  center={[m.lat, m.lng]}
-                  radius={m.blurRadiusM}
-                  pathOptions={{
-                    color: m.color,
-                    fillColor: m.color,
-                    fillOpacity: 0.12,
-                    weight: 2,
-                    dashArray: "6 6",
-                  }}
-                />
-              )}
-              <Marker
-                position={[m.lat, m.lng]}
-                icon={buildDivIcon(m, m.id === selectedId)}
-                eventHandlers={{ click: () => onSelectMember(m.id) }}
-              />
-            </Fragment>
-          );
-        })}
-      </MapContainer>
+      <div ref={containerRef} className="h-full w-full" />
     </div>
   );
-}
-
-function FlyTo({
-  target,
-}: {
-  target: { lat: number; lng: number; zoom?: number } | null;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!target) return;
-    map.flyTo([target.lat, target.lng], target.zoom ?? 16, { duration: 0.75 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target?.lat, target?.lng, target?.zoom]);
-
-  return null;
 }
