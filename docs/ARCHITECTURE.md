@@ -41,33 +41,27 @@ The consequence that matters: **the server is a dumb pipe with an access-control
 
 | Layer | Choice |
 |---|---|
-| Web client | **Next.js** |
+| Web client | **Next.js** — client shell + router only (see below) |
 | API | **Node + TypeScript + Fastify** |
 | Realtime | **WebSocket** |
 | Database | **PostgreSQL only** |
 | ORM | **Prisma** |
 | Fanout | **In-memory, behind a swappable interface** |
+| Map rendering | **Leaflet + OpenStreetMap hosted tiles** |
+| Styling | **Tailwind v4 + a small `packages/ui` design-system layer** |
 | Deployment | **Docker Compose** |
 | Native (later) | **Expo** |
 
 ### Not yet decided **[OPEN]**
 
-- Map rendering library. See §5.2 — the tile-privacy problem constrains this.
-- Styling and component approach.
 - Client state management.
 - Local caching mechanism.
 - Session/auth library vs. hand-rolled.
 - Migration and deployment tooling beyond Prisma's own.
 
-### Notes on the Next.js choice
+### Next.js role **[DECIDED]**
 
-You've chosen Next.js with a **separate** Fastify API, which is a valid but unusual pairing — it leaves Next's server runtime with little to do. Worth deciding deliberately: **[OPEN]**
-
-- Is Next purely a client-side app with a router, or does its server layer do real work?
-- Does Next act as a BFF (proxying to Fastify, holding the session cookie server-side), or does the browser talk to Fastify directly?
-- Is there SSR at all? Most of this app is behind auth and driven by a live map, so SSR may buy nothing.
-
-**[PROPOSED]** Browser talks to Fastify directly for both REST and WS; Next serves the app shell and routing only. Simplest, avoids a second hop, and keeps one auth path rather than two.
+Next is a **client shell + router only**: the browser talks to Fastify directly for both REST and WS, and Next's server runtime does no proxying or session-holding. No BFF, one auth path. There is effectively no SSR of authenticated data — most of the app is behind auth and driven by a live map, so server rendering buys nothing; Next's job is bundling, routing, and static shell delivery.
 
 ---
 
@@ -182,15 +176,15 @@ Two separate paths:
 **[OPEN]** Batch window length. 5 minutes is a placeholder, not a decision.
 **[OPEN]** Whether guests write history at all.
 
-### 5.2 The tile problem **[OPEN — needs a decision]**
-
-Not yet decided, but flagging it because it can quietly defeat the entire product.
+### 5.2 The tile problem **[DECIDED — deliberate deviation]**
 
 Fetching map tiles from a hosted provider (Mapbox, Google, and similar) transmits the user's viewport — effectively their location — to a third party on every pan. You'd have built end-to-end encryption and then leaked the same information through the basemap.
 
-Options: self-host a basemap (adds a container and a sizeable asset, but keeps zero outbound dependencies); use a hosted provider and disclose the leak honestly; or proxy tiles through your own API (hides the user's IP from the provider, but the provider still sees viewports and your server sees them too).
+Options considered: self-host a basemap (adds a container and a sizeable asset, keeps zero outbound dependencies); use a hosted provider and disclose the leak honestly; or proxy tiles through your own API (hides the user's IP from the provider, but the provider still sees viewports and your server sees them too).
 
-**[PROPOSED]** Self-host. It's the only option consistent with Principle 1, and it preserves the "no external dependencies" property that makes self-hosting real rather than theatrical.
+**Chosen: Leaflet + OpenStreetMap's hosted tile servers**, not a self-hosted basemap. Rationale: self-hosting a basemap is a meaningful chunk of infra (tile generation/storage, a container every self-hoster must run) for a v1 whose priority is shipping the core E2EE product. OSM's hosted tiles are free, require no API key, and keep the compose file simple.
+
+**Trade-off, disclosed honestly:** panning the map sends viewport coordinates to OSM's tile servers — a real, if coarse and non-attributable-to-identity, location leak to a third party. This is the opposite of the "self-host basemap" position originally proposed here. It is documented in-product (see PRD §9.2, §11) and in the self-host docs (Phase 3.4), not hidden. Revisit post-MVP if a self-hosted basemap becomes worth the added ops burden.
 
 ### 5.3 Entities **[PROPOSED skeleton]**
 
@@ -251,8 +245,8 @@ Encryption happens before anything leaves the module. There should be no code pa
 ### 6.3 Polling **[OPEN]**
 Undecided. Fixed-interval GPS polling is the fastest way to make this feel like a battery parasite, so some adaptation to movement is likely needed — but the strategy needs real device measurement before committing. Ghost mode should release the geolocation watch entirely rather than discarding results, so the guarantee holds at the OS level.
 
-### 6.4 Rendering **[OPEN]**
-Depends on the unchosen map library. One durable constraint regardless: data freshness must be visually encoded, and it should be a rendering concern rather than React state so it doesn't trigger re-renders every frame.
+### 6.4 Rendering **[DECIDED — map library]**
+Leaflet + OSM hosted tiles (§5.2). One durable constraint regardless of library: data freshness must be visually encoded, and it should be a rendering concern rather than React state so it doesn't trigger re-renders every frame.
 
 ---
 
@@ -284,7 +278,7 @@ Accepted cost of persistent accounts (PRD D2). Guests leak less: no email, no pe
 | Departed member | Rekey blocks future access. Already-downloaded history is unrecoverable |
 | Network observer | TLS. Traffic analysis reveals activity patterns; not defended in v1 |
 | Malicious member | In-scope by design — everyone chose to be visible to the room |
-| Tile provider tracking | **Unresolved.** See §5.2 |
+| Tile provider tracking | **Accepted, disclosed.** Leaflet + OSM hosted tiles leak viewport (not identity) to OSM on pan. See §5.2 |
 
 ### 7.4 The web delivery problem **[DECIDED — disclosed]**
 E2EE in a browser has a structural weakness: the server ships the code that does the encryption. A malicious operator could serve a build that exfiltrates keys. This is not solvable within a web app, and we shouldn't pretend otherwise.
@@ -301,7 +295,7 @@ services:
   api:    # Fastify — REST + WS + batch writer
   db:     # Postgres, named volume
   proxy:  # TLS termination
-  # tiles: pending §5.2
+  # No tiles container — Leaflet + OSM hosted tiles, see §5.2
 ```
 
 **Operator requirements:** a domain, Docker, modest RAM. No external accounts, no API keys, no SMTP. Zero outbound dependencies is the design target — it's what makes self-hosting real.
