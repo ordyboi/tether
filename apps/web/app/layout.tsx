@@ -20,13 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn("h-full antialiased", "font-sans", geist.variable)}>
-      <body
-        className="min-h-full w-full bg-[#1b140c] text-amber-50"
-        style={{
-          fontFamily:
-            '"Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif',
-        }}
-      >
+      <body className="min-h-full w-full bg-[#1b140c] text-amber-50">
         <TooltipProvider>
           <div className="relative mx-auto flex h-screen max-w-3xl flex-col overflow-hidden">
             <main className="flex-1 overflow-y-auto">{children}</main>
