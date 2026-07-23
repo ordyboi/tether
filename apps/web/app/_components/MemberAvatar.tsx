@@ -4,6 +4,7 @@ import type { MockMember } from "@/lib/mock-data";
 import { staleness } from "@/lib/mock-data";
 import { EyeOff } from "lucide-react";
 import clsx from "clsx";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatSecondsAgo } from "../_lib/visuals";
 
 const SIZES = {
@@ -29,27 +30,24 @@ export default function MemberAvatar({
   const dims = SIZES[size];
   const isGhost = member.sharingState === "ghost" || stale === "hidden";
 
-  const Comp = onClick ? "button" : "div";
-
   return (
     <div className="flex flex-col items-center gap-1">
-      <Comp
-        onClick={onClick}
+      <Avatar
+        render={onClick ? <button type="button" onClick={onClick} /> : <div />}
+        aria-label={member.name}
         className={clsx(
-          "relative flex shrink-0 items-center justify-center rounded-full border-[3px] transition",
+          "relative flex shrink-0 items-center justify-center rounded-full border-[3px] shadow-none transition after:hidden",
           onClick && "active:scale-95",
           isGhost
             ? "border-dashed border-stone-500 bg-stone-800/70 grayscale"
-            : "bg-[#2a1d10]",
+            : "bg-card",
           stale === "stale" && !isGhost && "opacity-50 saturate-50",
-          stale === "live" && "shadow-[0_0_0_5px_rgba(0,0,0,0)]",
         )}
         style={{
           width: dims.box,
           height: dims.box,
           borderColor: ring ? (isGhost ? undefined : member.color) : "transparent",
         }}
-        aria-label={member.name}
       >
         {stale === "live" && !isGhost && (
           <span
@@ -57,13 +55,15 @@ export default function MemberAvatar({
             style={{ backgroundColor: member.color }}
           />
         )}
-        <span className={clsx(dims.emoji, isGhost && "opacity-60")}>
+        <AvatarFallback
+          className={clsx("bg-transparent", dims.emoji, isGhost && "opacity-60")}
+        >
           {member.emoji}
-        </span>
+        </AvatarFallback>
 
         {/* sharing-state badge */}
         <span
-          className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full border-2 border-[#1b140c]"
+          className="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full border-2 border-background"
           style={{ width: dims.badge, height: dims.badge }}
         >
           {member.sharingState === "exact" && (
@@ -83,7 +83,7 @@ export default function MemberAvatar({
             </span>
           )}
         </span>
-      </Comp>
+      </Avatar>
       {showTimeLabel && (
         <span
           className={clsx(

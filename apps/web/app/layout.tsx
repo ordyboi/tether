@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import NavStrip from "./_components/NavStrip";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -26,10 +27,12 @@ export default function RootLayout({
             '"Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif',
         }}
       >
-        <div className="relative mx-auto flex h-screen max-w-3xl flex-col overflow-hidden">
-          <main className="flex-1 overflow-y-auto">{children}</main>
-          <NavStrip />
-        </div>
+        <TooltipProvider>
+          <div className="relative mx-auto flex h-screen max-w-3xl flex-col overflow-hidden">
+            <main className="flex-1 overflow-y-auto">{children}</main>
+            <NavStrip />
+          </div>
+        </TooltipProvider>
       </body>
     </html>
   );

@@ -18,6 +18,19 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // Chunky "campfire" CTAs: thick border, hard drop shadow, press-down on active.
+        tether:
+          "border-[3px] border-orange-600 bg-orange-500 text-white shadow-[0_4px_0_0_var(--shadow-hard-color)] hover:bg-orange-500 active:translate-y-1 active:shadow-none disabled:border-stone-600 disabled:bg-stone-700 disabled:text-stone-400 disabled:shadow-none",
+        "tether-success":
+          "border-[3px] border-green-600 bg-green-500 text-white shadow-[0_4px_0_0_var(--shadow-hard-color)] hover:bg-green-500 active:translate-y-1 active:shadow-none disabled:border-stone-600 disabled:bg-stone-700 disabled:text-stone-400 disabled:shadow-none",
+        "tether-info":
+          "border-[3px] border-blue-700 bg-blue-500 text-white shadow-[0_4px_0_0_var(--shadow-hard-color)] hover:bg-blue-500 active:translate-y-1 active:shadow-none disabled:border-stone-600 disabled:bg-stone-700 disabled:text-stone-400 disabled:shadow-none",
+        "tether-danger":
+          "border-[3px] border-red-600 bg-red-600/20 text-red-300 active:translate-y-0.5 disabled:border-stone-600 disabled:bg-transparent disabled:text-stone-500",
+        "tether-outline":
+          "border-[3px] border-border bg-card text-muted-foreground hover:border-[#5c4326] hover:text-foreground",
+        "tether-ghost":
+          "border-2 border-border bg-card/95 text-muted-foreground backdrop-blur hover:text-foreground",
       },
       size: {
         default:
@@ -31,6 +44,13 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
+        // Chunky sizes used by the campfire CTAs.
+        "tether-block":
+          "h-auto w-full gap-2 rounded-full px-4 py-3.5 text-base font-extrabold",
+        "tether-pill":
+          "h-auto gap-1.5 rounded-full px-3 py-2 text-xs font-extrabold",
+        "tether-icon": "size-11 rounded-full [&_svg:not([class*='size-'])]:size-[18px]",
+        "tether-icon-sm": "size-8 rounded-full [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

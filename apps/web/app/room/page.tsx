@@ -8,6 +8,8 @@ import { mockRoom, mockMembers, staleness, type SharingState } from "@/lib/mock-
 import AvatarTray from "../_components/AvatarTray";
 import MemberSheet from "../_components/MemberSheet";
 import GhostControls from "../_components/GhostControls";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const RoomMap = dynamic(() => import("../_components/RoomMap"), {
   ssr: false,
@@ -52,29 +54,30 @@ export default function RoomPage() {
   return (
     <div className="flex h-full flex-col">
       {/* status bar */}
-      <div className="flex items-center justify-between gap-3 border-b-[3px] border-[#4a3420] bg-[#1b140c] px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b-[3px] border-border bg-background px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-orange-500 bg-[#2a1d10] text-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-orange-500 bg-card text-lg">
             {mockRoom.emoji}
           </div>
           <div>
-            <p className="text-sm font-extrabold leading-tight text-amber-50">
+            <p className="text-sm leading-tight font-extrabold text-foreground">
               {mockRoom.name}
             </p>
-            <p className="flex items-center gap-1 text-[11px] font-bold text-amber-200/50">
+            <p className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
               <Users size={11} /> {members.length}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 rounded-full border-2 border-green-500/60 bg-green-500/10 px-2.5 py-1 text-xs font-extrabold text-green-300">
+          <Badge variant="live">
             <Radio size={12} strokeWidth={3} />
             {liveCount} live
-          </span>
-          <button
+          </Badge>
+          <Button
             onClick={() => setShowGhostControls(true)}
-            className="flex items-center gap-1 rounded-full border-2 border-[#4a3420] bg-[#2a1d10] px-2.5 py-1.5 text-xs font-extrabold text-amber-200/70 hover:text-amber-100"
+            variant="tether-outline"
+            size="tether-pill"
           >
             <Ghost size={14} strokeWidth={2.5} />
             {self.sharingState === "ghost"
@@ -82,14 +85,16 @@ export default function RoomPage() {
               : self.sharingState === "approx"
                 ? "Blurred"
                 : "Exact"}
-          </button>
-          <Link
-            href="/room/share"
-            className="flex items-center gap-1 rounded-full border-2 border-orange-600 bg-orange-500 px-2.5 py-1.5 text-xs font-extrabold text-white"
+          </Button>
+          <Button
+            render={<Link href="/room/share" />}
+            nativeButton={false}
+            variant="tether"
+            size="tether-pill"
           >
             <Share2 size={14} strokeWidth={2.5} />
             Share
-          </Link>
+          </Button>
         </div>
       </div>
 
