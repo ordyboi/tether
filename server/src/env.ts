@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { env as environment, exit } from "node:process";
 import { z } from "zod";
 
-if (existsSync(".env")) process.loadEnvFile();
+if (existsSync(`${import.meta.dirname}/.env`)) process.loadEnvFile(`${import.meta.dirname}/.env`);
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),

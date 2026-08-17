@@ -18,8 +18,8 @@ Monorepo for Tether: an Expo React Native client + Fastify server (TypeScript) w
 ```bash
 npm install
 cp server/.env.example server/.env
-docker compose up -d
-npm run db:migrate
+npm run docker:up
+npm run db:migrate -w server
 ```
 
 ## Run

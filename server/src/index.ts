@@ -16,7 +16,7 @@ declare module "fastify" {
 const app = fastify({ logger: true });
 
 await app.register(cors, { origin: env.CORS_ORIGIN });
-await app.register(websocket);
+await app.register(websocket, { options: { maxPayload: 128 * 1024 } });
 
 app.decorate("db", db);
 
