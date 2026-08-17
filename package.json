@@ -1,0 +1,16 @@
+{
+  "name": "tether",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w server",
+    "start:client": "npm run start -w client",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "typecheck": "npm run typecheck -ws --if-present"
+  }
+}
