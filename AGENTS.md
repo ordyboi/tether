@@ -18,3 +18,4 @@ Do not use return types rely on inference.
 
 Do use double quotes for strings.
 Do end every line of code with a semicolon `;`.
+Do use `node:` imports and destructring when calling Node.js APIs

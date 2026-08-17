@@ -1,8 +1,11 @@
 import { existsSync } from "node:fs";
-import { env as environment, exit } from "node:process";
+import { env as envFile, loadEnvFile, exit } from "node:process";
 import { z } from "zod";
 
-if (existsSync(`${import.meta.dirname}/.env`)) process.loadEnvFile(`${import.meta.dirname}/.env`);
+const envFilePath = `${import.meta.dirname}/.env`;
+if (existsSync(envFilePath)) {
+  loadEnvFile(envFilePath);
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -12,7 +15,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.url().default("http://localhost:8081"),
 });
 
-const parsed = envSchema.safeParse(environment);
+const parsed = envSchema.safeParse(envFile);
 if (!parsed.success) {
   console.error("Invalid environment variables:", z.treeifyError(parsed.error));
   exit(1);
