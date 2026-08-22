@@ -1,6 +1,6 @@
 # Tether
 
-A privacy, end-to-end encrypted location sharing service for friends, colleagues or family. 
+A privacy, end-to-end encrypted location sharing service for friends, colleagues or family.
 
 ## Guidance when working in the client workspace - Expo HAS CHANGED
 
@@ -15,6 +15,7 @@ Do not run a dev server or a build unless you need to verify something, ask the 
 
 Do not use `any` type or verbose type definitions.
 Do not use return types rely on inference.
+Do not compare to `undefined` (or `null`) with `!== undefined`/`!= null`. Use plain truthiness instead, e.g. `thing && otherThing` instead of `thing !== undefined && otherThing`.
 
 Do use double quotes for strings.
 Do end every line of code with a semicolon `;`.

@@ -43,5 +43,5 @@ server/dist/
 example
 
 # generated native folders
-/ios
-/android
+ios
+android
