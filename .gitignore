@@ -4,8 +4,6 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 
-.expo/android
-.expo/ios
-.expo
+.expo/
 
 .claude/worktrees
