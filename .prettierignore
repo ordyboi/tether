@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+.expo
+coverage
+package-lock.json
+
+# planning docs, not code
+*.md
