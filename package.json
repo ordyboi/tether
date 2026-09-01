@@ -2,7 +2,8 @@
   "name": "tether",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "lint": "eslint .",
