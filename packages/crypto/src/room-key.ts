@@ -20,6 +20,10 @@ export interface RoomKeyEnvelopeContext {
   readonly deviceId: string;
 }
 
+// Field order here deliberately does not match wrapAad below — this mirrors
+// key-management-spec.md §2 exactly (salt = deviceId||roomId||epoch, aad =
+// roomId||epoch||deviceId). Do not "fix" the apparent inconsistency: doing so
+// changes every wrap key derived and breaks every envelope already written.
 function wrapKeySalt(context: RoomKeyEnvelopeContext): Uint8Array {
   return encodeFields([
     stringField(context.deviceId),
@@ -56,28 +60,12 @@ export async function unwrapRoomKey(
   deviceSecretKey: Uint8Array,
   context: RoomKeyEnvelopeContext,
 ): Promise<RoomKey> {
+  if (wrappedKey.length < EPHEMERAL_PUBLIC_KEY_LENGTH + aead.keyLength) {
+    throw new Error("wrapped room key is truncated");
+  }
   const ephemeralPublicKey = wrappedKey.subarray(0, EPHEMERAL_PUBLIC_KEY_LENGTH);
   const sealed = wrappedKey.subarray(EPHEMERAL_PUBLIC_KEY_LENGTH);
   const shared = scalarMult(deviceSecretKey, ephemeralPublicKey);
   const wrapKey = hkdfSha256(shared, wrapKeySalt(context), ROOM_KEY_WRAP_INFO, aead.keyLength);
   return aead.open(wrapKey, sealed, wrapAad(context));
-}
-
-export async function sealUnderRoomKey(
-  aead: Aead,
-  roomKey: RoomKey,
-  plaintext: Uint8Array,
-  aad: Uint8Array,
-  random: RandomSource,
-): Promise<Uint8Array> {
-  return aead.seal(roomKey, plaintext, aad, random);
-}
-
-export async function openUnderRoomKey(
-  aead: Aead,
-  roomKey: RoomKey,
-  sealed: Uint8Array,
-  aad: Uint8Array,
-): Promise<Uint8Array> {
-  return aead.open(roomKey, sealed, aad);
 }

@@ -17,9 +17,10 @@ export interface RatchetState {
 }
 
 // `generation` is the caller's running count across epoch bumps and manual resets
-// (0 at room creation); this function only derives the seed for that generation.
+// (0 at room creation), mixed into the HKDF salt so re-initializing under an
+// unchanged room key with a bumped generation still yields a fresh chain.
 export function initRatchet(roomKey: RoomKey, authorAlias: string, generation = 0): RatchetState {
-  const salt = encodeFields([stringField(authorAlias)]);
+  const salt = encodeFields([stringField(authorAlias), uint64Field(generation)]);
   const key = hkdfSha256(roomKey, salt, RATCHET_INIT_INFO, RATCHET_KEY_LENGTH);
   return { key, index: 0, generation };
 }
@@ -40,6 +41,13 @@ export function rerandomizeRatchet(state: RatchetState, random: RandomSource): R
   return { key: random(RATCHET_KEY_LENGTH), index: 0, generation: state.generation + 1 };
 }
 
+// `targetIndex` arrives from the server (fix.ratchetIndex) and is not trusted
+// for integrity (spec §7); an unbounded skip lets one row pin the device's CPU
+// indefinitely. 10,000 covers roughly a week of catch-up for an on_request room
+// uploading a precise fix per minute (~1,440/day) — comfortably more than any
+// legitimate gap, and cheap to widen later if that assumption is wrong.
+export const MAX_RATCHET_SKIP = 10_000;
+
 export function deriveRatchetKeyAt(
   grantKey: Uint8Array,
   grantIndex: number,
@@ -47,6 +55,9 @@ export function deriveRatchetKeyAt(
 ): Uint8Array {
   if (targetIndex < grantIndex) {
     throw new Error("cannot derive a ratchet key at an index before the grant");
+  }
+  if (targetIndex - grantIndex > MAX_RATCHET_SKIP) {
+    throw new Error("ratchet skip exceeds the maximum derivable window");
   }
   let key = grantKey;
   for (let i = grantIndex; i < targetIndex; i++) {

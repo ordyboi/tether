@@ -2,13 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { generateIdentityKeyPair } from "./identity.js";
 import { defaultRandomSource } from "./random.js";
-import {
-  generateRoomKey,
-  openUnderRoomKey,
-  sealUnderRoomKey,
-  unwrapRoomKey,
-  wrapRoomKey,
-} from "./room-key.js";
+import { generateRoomKey, unwrapRoomKey, wrapRoomKey } from "./room-key.js";
 import { AEADS } from "./test-support/aeads.js";
 
 describe.each(AEADS)("room-key wrap/unwrap under %s", (_name, aead) => {
@@ -47,21 +41,12 @@ describe.each(AEADS)("room-key wrap/unwrap under %s", (_name, aead) => {
     await expect(unwrapRoomKey(aead, wrapped, device.secretKey, openContext)).rejects.toThrow();
   });
 
-  it("generates independent keys across epochs", () => {
-    const first = generateRoomKey(random);
-    const second = generateRoomKey(random);
+  it("rejects a truncated wrapped key instead of silently misparsing it", async () => {
+    const device = generateIdentityKeyPair(random);
+    const context = { roomId: "room-1", epoch: 3, deviceId: "device-a" };
 
-    expect(first).not.toEqual(second);
-  });
-
-  it("seals and opens arbitrary plaintext directly under the room key (e.g. room name)", async () => {
-    const roomKey = generateRoomKey(random);
-    const aad = new Uint8Array([1, 2, 3]);
-    const plaintext = new TextEncoder().encode("The Smiths");
-
-    const sealed = await sealUnderRoomKey(aead, roomKey, plaintext, aad, random);
-    const opened = await openUnderRoomKey(aead, roomKey, sealed, aad);
-
-    expect(opened).toEqual(plaintext);
+    await expect(
+      unwrapRoomKey(aead, new Uint8Array(10), device.secretKey, context),
+    ).rejects.toThrow("truncated");
   });
 });

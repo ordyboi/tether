@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { bytesToHex, hexToBytes, utf8ToBytes } from "../bytes.js";
 import type { RandomSource } from "../random.js";
-import { aesGcm } from "./aes-gcm.js";
+import { aesGcm } from "./noble-aead.js";
 import vectors from "../../vectors/phase0b.json" with { type: "json" };
 
 // Phase 0b's known-answer vector asserts exact ciphertext bytes, which only

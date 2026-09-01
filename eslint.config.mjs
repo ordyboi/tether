@@ -14,13 +14,7 @@ export default tseslint.config(
     extends: [expoConfig],
   },
   {
-    files: ["apps/server/**/*.ts"],
-    rules: {
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-    },
-  },
-  {
-    files: ["packages/**/*.ts"],
+    files: ["apps/server/**/*.ts", "packages/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
     },

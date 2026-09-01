@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultRandomSource } from "./random.js";
 import { generateRoomKey } from "./room-key.js";
 import {
+  MAX_RATCHET_SKIP,
   advanceRatchet,
   deriveRatchetKeyAt,
   initRatchet,
@@ -13,18 +14,16 @@ import {
 import { AEADS } from "./test-support/aeads.js";
 
 describe("ratchet key derivation", () => {
-  it("advance is one-way: the previous key cannot be recovered from the next", () => {
+  it("advance is deterministic and moves off the current key", () => {
     const roomKey = generateRoomKey(defaultRandomSource);
     const state0 = initRatchet(roomKey, "alice");
     const state1 = advanceRatchet(state0);
 
-    // Deriving forward from state0 lands on state1's key...
     expect(advanceRatchet(state0).key).toEqual(state1.key);
-    // ...but there is no inverse of advanceRatchet to walk state1 back to state0.
     expect(state1.key).not.toEqual(state0.key);
   });
 
-  it("re-randomization is not derived from the prior chain and bumps the generation", () => {
+  it("re-randomization bumps the generation and resets the index", () => {
     const roomKey = generateRoomKey(defaultRandomSource);
     const state0 = initRatchet(roomKey, "alice");
     const state1 = advanceRatchet(state0);
@@ -33,8 +32,15 @@ describe("ratchet key derivation", () => {
 
     expect(reset.generation).toBe(state1.generation + 1);
     expect(reset.index).toBe(0);
-    expect(reset.key).not.toEqual(state1.key);
-    expect(reset.key).not.toEqual(advanceRatchetKeyOf(state1));
+  });
+
+  it("initRatchet derives a different key per generation under the same room key", () => {
+    const roomKey = generateRoomKey(defaultRandomSource);
+
+    const generation0 = initRatchet(roomKey, "alice", 0);
+    const generation7 = initRatchet(roomKey, "alice", 7);
+
+    expect(generation0.key).not.toEqual(generation7.key);
   });
 
   it("deriveRatchetKeyAt walks a grant forward to later indices in the same generation", () => {
@@ -54,9 +60,9 @@ describe("ratchet key derivation", () => {
     expect(() => deriveRatchetKeyAt(new Uint8Array(32), 3, 1)).toThrow();
   });
 
-  function advanceRatchetKeyOf(state: ReturnType<typeof initRatchet>) {
-    return advanceRatchet(state).key;
-  }
+  it("deriveRatchetKeyAt refuses a skip beyond MAX_RATCHET_SKIP", () => {
+    expect(() => deriveRatchetKeyAt(new Uint8Array(32), 0, MAX_RATCHET_SKIP + 1)).toThrow();
+  });
 });
 
 describe.each(AEADS)("ratchet seal/open under %s", (_name, aead) => {

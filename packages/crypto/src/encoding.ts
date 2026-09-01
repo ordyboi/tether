@@ -18,9 +18,7 @@ export function encodeFields(fields: readonly EncodableField[]): Uint8Array {
   const parts: Uint8Array[] = [];
   for (const field of fields) {
     const content =
-      field.kind === "string"
-        ? utf8ToBytes(field.value.toLowerCase())
-        : uint64BE(BigInt(field.value));
+      field.kind === "string" ? utf8ToBytes(field.value) : uint64BE(BigInt(field.value));
     parts.push(uint32BE(content.length), content);
   }
   return concatBytes(...parts);

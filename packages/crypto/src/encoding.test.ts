@@ -19,17 +19,11 @@ describe("encodeFields", () => {
     expect(bytesToHex(a)).not.toBe(bytesToHex(b));
   });
 
-  it("is deterministic and round-trips through equal input", () => {
-    const fields = [stringField("roomId"), uint64Field(42), stringField("deviceId")];
-
-    expect(bytesToHex(encodeFields(fields))).toBe(bytesToHex(encodeFields(fields)));
-  });
-
-  it("lowercases string fields so case cannot smuggle extra distinctness", () => {
+  it("keeps string fields case-sensitive, so distinct ids never collide", () => {
     const a = encodeFields([stringField("RoomId")]);
     const b = encodeFields([stringField("roomid")]);
 
-    expect(bytesToHex(a)).toBe(bytesToHex(b));
+    expect(bytesToHex(a)).not.toBe(bytesToHex(b));
   });
 
   it("encodes an empty field list as an empty buffer", () => {

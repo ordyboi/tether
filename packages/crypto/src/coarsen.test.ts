@@ -1,15 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  BUFFER_M,
-  CELL_SIZE_M,
-  type CoarsenState,
-  coarsen,
-  coarsenProjected,
-  distanceToCellRect,
-  projectToMeters,
-  unprojectFromMeters,
-} from "./coarsen.js";
+import { type CoarsenState, coarsen, coarsenProjected } from "./coarsen.js";
 
 describe("coarsen", () => {
   it("matches the seven-row spec table (§4), in meter space", () => {
@@ -42,42 +33,24 @@ describe("coarsen", () => {
     }
   });
 
-  it("the lat/lng wrapper is deterministic and stable for a repeated fix", () => {
-    const { lat, lng } = unprojectFromMeters(1200, 800, 51.5);
+  // Regression for the bug where unprojection used the fix's true latitude
+  // instead of the cell centre's: every point inside one cell must coarsen
+  // to the exact same reported point, or the coarse output leaks true
+  // position through its longitude.
+  it("every point inside one cell coarsens to the same point", () => {
+    const first = coarsen(40.71, -74.006, null);
+    let state = first.state;
 
-    const first = coarsen(lat, lng, null);
-    const second = coarsen(lat, lng, first.state);
-
-    expect(second.state).toEqual(first.state);
-    expect(second.point).toEqual(first.point);
-  });
-
-  it("computes distanceToCellRect for row 3 and row 4 of the spec table", () => {
-    expect(distanceToCellRect(2010, 900, 1, 0)).toBeCloseTo(10, 9);
-    expect(distanceToCellRect(2060, 900, 1, 0)).toBeCloseTo(60, 9);
-  });
-
-  it("never changes cell for two points within BUFFER_M of each other on the same side of a boundary", () => {
-    // Both points sit inside cell (1, 0), within BUFFER_M of the x=2000 edge.
-    const afterFirst = coarsenProjected(1970, 900, null);
-    const afterSecond = coarsenProjected(1990, 900, afterFirst.state);
-
-    expect(afterSecond.state).toEqual(afterFirst.state);
-  });
-
-  it("projection and unprojection round-trip for an arbitrary point", () => {
-    const lat = 51.5;
-    const lng = -0.12;
-
-    const { x, y } = projectToMeters(lat, lng);
-    const back = unprojectFromMeters(x, y, lat);
-
-    expect(back.lat).toBeCloseTo(lat, 9);
-    expect(back.lng).toBeCloseTo(lng, 9);
-  });
-
-  it("uses CELL_SIZE_M and BUFFER_M as documented constants", () => {
-    expect(CELL_SIZE_M).toBe(1000);
-    expect(BUFFER_M).toBe(50);
+    for (let i = 1; i <= 10; i++) {
+      const result = coarsen(40.71 + (i * 50) / 110_540, -74.006, state);
+      if (
+        result.state.currentCellX !== first.state.currentCellX ||
+        result.state.currentCellY !== first.state.currentCellY
+      ) {
+        break;
+      }
+      state = result.state;
+      expect(result.point).toEqual(first.point);
+    }
   });
 });

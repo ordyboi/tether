@@ -2,8 +2,6 @@ import type { RandomSource } from "../random.js";
 
 export interface Aead {
   readonly keyLength: number;
-  readonly nonceLength: number;
-  readonly tagLength: number;
   // Returns nonce || ciphertext || tag; draws its own nonce from `random`.
   seal(
     key: Uint8Array,

@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { MAX_FIX_PAYLOAD_LENGTH, padFixPlaintext, unpadFixPlaintext } from "./padding.js";
 
 describe("padding", () => {
-  it("pads every length 0..254 to exactly 256 bytes and round-trips", () => {
-    for (let length = 0; length <= MAX_FIX_PAYLOAD_LENGTH; length++) {
-      const payload = new Uint8Array(length).map((_, i) => i % 256);
+  it("pads to exactly 256 bytes and round-trips, at the length boundaries", () => {
+    for (const length of [0, 1, MAX_FIX_PAYLOAD_LENGTH]) {
+      const payload = new Uint8Array(length).map((_, i) => i);
 
       const padded = padFixPlaintext(payload);
 

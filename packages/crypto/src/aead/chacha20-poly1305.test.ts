@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { bytesToHex, hexToBytes, utf8ToBytes } from "../bytes.js";
 import type { RandomSource } from "../random.js";
-import { chacha20Poly1305 } from "./chacha20-poly1305.js";
+import { chacha20Poly1305 } from "./noble-aead.js";
 
 // RFC 8439 §2.8.2, "Example and Test Vector for AEAD_CHACHA20_POLY1305".
 // This is chacha20Poly1305's own known-answer test, standalone like the AES one.

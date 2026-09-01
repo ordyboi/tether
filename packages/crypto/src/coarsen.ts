@@ -32,7 +32,7 @@ function cellCenter(cellX: number, cellY: number): ProjectedPoint {
   return { x: (cellX + 0.5) * CELL_SIZE_M, y: (cellY + 0.5) * CELL_SIZE_M };
 }
 
-export function distanceToCellRect(x: number, y: number, cellX: number, cellY: number): number {
+function distanceToCellRect(x: number, y: number, cellX: number, cellY: number): number {
   const xMin = cellX * CELL_SIZE_M;
   const xMax = (cellX + 1) * CELL_SIZE_M;
   const yMin = cellY * CELL_SIZE_M;
@@ -47,8 +47,7 @@ export interface CoarsenProjectedResult {
   readonly center: ProjectedPoint;
 }
 
-// Pure meter-space cell/hysteresis logic — the projection wrapping this is
-// standard and not itself under test (spec §4).
+// Pure meter-space cell/hysteresis logic (spec §4).
 export function coarsenProjected(
   x: number,
   y: number,
@@ -77,8 +76,17 @@ export interface CoarsenResult {
   readonly point: LatLng;
 }
 
+// Callers pass real GPS fixes, which are never polar; antimeridian wrapping
+// is likewise not built, since neither is a plausible input for this product.
 export function coarsen(lat: number, lng: number, state: CoarsenState | null): CoarsenResult {
+  if (Math.abs(lat) >= 90) {
+    throw new Error("coarsen does not support polar latitudes");
+  }
   const { x, y } = projectToMeters(lat, lng);
   const { state: nextState, center } = coarsenProjected(x, y, state);
-  return { state: nextState, point: unprojectFromMeters(center.x, center.y, lat) };
+  // Unproject at the cell centre's own latitude, not the fix's — using the
+  // true latitude here would make the reported longitude a continuous
+  // function of the real position, leaking it through repeated observation.
+  const centerLat = center.y / 110_540;
+  return { state: nextState, point: unprojectFromMeters(center.x, center.y, centerLat) };
 }
