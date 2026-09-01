@@ -1,5 +1,5 @@
 import {
-  pgTable,
+  snakeCase,
   text,
   timestamp,
   boolean,
@@ -8,7 +8,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
+export const user = snakeCase.table("user", {
   id: text().primaryKey(),
   name: text().notNull(),
   email: text().notNull().unique(),
@@ -22,7 +22,7 @@ export const user = pgTable("user", {
   isAnonymous: boolean().default(false),
 });
 
-export const session = pgTable(
+export const session = snakeCase.table(
   "session",
   {
     id: text().primaryKey(),
@@ -41,7 +41,7 @@ export const session = pgTable(
   (table) => [index("session_userId_idx").on(table.userId)],
 );
 
-export const account = pgTable(
+export const account = snakeCase.table(
   "account",
   {
     id: text().primaryKey(),
@@ -68,7 +68,7 @@ export const account = pgTable(
   ],
 );
 
-export const verification = pgTable(
+export const verification = snakeCase.table(
   "verification",
   {
     id: text().primaryKey(),
@@ -84,7 +84,7 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const passkey = pgTable(
+export const passkey = snakeCase.table(
   "passkey",
   {
     id: text().primaryKey(),

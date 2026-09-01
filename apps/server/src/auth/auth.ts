@@ -6,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { anonymous } from "better-auth/plugins";
 
 import { db } from "../db/client.js";
+import * as schema from "../db/schema/auth.js";
 import { env } from "../env.js";
 
 const SYNTHETIC_NAME = "tether user";
@@ -19,7 +20,7 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: env.TRUSTED_ORIGINS,
-  database: drizzleAdapter(db, { provider: "pg" }),
+  database: drizzleAdapter(db, { provider: "pg", schema }),
   advanced: {
     ipAddress: {
       disableIpTracking: true,
