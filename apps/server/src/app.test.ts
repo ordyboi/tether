@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildApp } from "./app.js";
 
-function captureLogger(): { stream: Writable; output: () => string } {
+function captureLogger() {
   const chunks: string[] = [];
   const stream = new Writable({
     write(chunk, _encoding, callback) {

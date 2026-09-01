@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
@@ -5,10 +7,13 @@ import { anonymous } from "better-auth/plugins";
 
 import { db } from "../db/client.js";
 import { env } from "../env.js";
-import { SYNTHETIC_NAME, syntheticEmail } from "./synthetic-identity.js";
 
-const googleConfigured = env.GOOGLE_CLIENT_ID.length > 0;
-const appleConfigured = env.APPLE_CLIENT_ID.length > 0;
+const SYNTHETIC_NAME = "tether user";
+const SYNTHETIC_EMAIL_DOMAIN = "stripped.tether.invalid";
+
+function syntheticEmail() {
+  return `${randomUUID()}@${SYNTHETIC_EMAIL_DOMAIN}`;
+}
 
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
@@ -27,19 +32,15 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    ...(googleConfigured && {
-      google: {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-      },
-    }),
-    ...(appleConfigured && {
-      apple: {
-        clientId: env.APPLE_CLIENT_ID,
-        clientSecret: env.APPLE_CLIENT_SECRET,
-        appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER,
-      },
-    }),
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+    },
+    apple: {
+      clientId: env.APPLE_CLIENT_ID,
+      clientSecret: env.APPLE_CLIENT_SECRET,
+      appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER,
+    },
   },
   databaseHooks: {
     user: {

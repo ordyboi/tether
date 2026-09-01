@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,12 +10,11 @@ import {
   user as userTable,
 } from "../db/schema/auth.js";
 import { auth } from "./auth.js";
-import { truncateAuthTables } from "./test-helpers.js";
 
 const REAL_NAME = "Real Person";
 const REAL_EMAIL = "real.person@gmail.com";
 
-function buildUnsignedGoogleIdToken(): string {
+function buildUnsignedGoogleIdToken() {
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
   const nowSeconds = Math.floor(Date.now() / 1000);
   const payload = Buffer.from(
@@ -37,7 +36,7 @@ function buildUnsignedGoogleIdToken(): string {
   return `${header}.${payload}.unsigned-test-signature`;
 }
 
-function assertDefined<T>(value: T | undefined, message: string): T {
+function assertDefined<T>(value: T | undefined, message: string) {
   expect(value, message).toBeDefined();
   if (value === undefined) throw new Error(message);
   return value;
@@ -46,7 +45,9 @@ function assertDefined<T>(value: T | undefined, message: string): T {
 let app: FastifyInstance | null = null;
 
 beforeEach(async () => {
-  await truncateAuthTables();
+  await db.execute(
+    sql`truncate table "user", "session", "account", "verification", "passkey" cascade`,
+  );
 });
 
 afterEach(async () => {

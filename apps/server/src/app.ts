@@ -1,5 +1,5 @@
 import cors from "@fastify/cors";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify from "fastify";
 
 import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
@@ -9,7 +9,7 @@ export type BuildAppOptions = {
   loggerStream?: NodeJS.WritableStream;
 };
 
-export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
+export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
     logger: {
       stream: options.loggerStream,
