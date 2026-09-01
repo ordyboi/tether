@@ -13,28 +13,21 @@ export interface InviteWrapContext {
   readonly inviteId: string;
 }
 
-function inviteWrapKey(aead: Aead, inviteSecret: Uint8Array, roomId: string): Uint8Array {
-  const salt = encodeFields([stringField(roomId)]);
-  return hkdfSha256(inviteSecret, salt, INVITE_KEY_WRAP_INFO, aead.keyLength);
-}
-
-function inviteAad(context: InviteWrapContext): Uint8Array {
-  return encodeFields([
-    stringField(context.roomId),
-    uint64Field(context.epoch),
-    stringField(context.inviteId),
-  ]);
-}
-
 export async function wrapRoomKeyForInvite(
   aead: Aead,
   inviteSecret: Uint8Array,
   roomKey: RoomKey,
   context: InviteWrapContext,
   random: RandomSource,
-): Promise<Uint8Array> {
-  const wrapKey = inviteWrapKey(aead, inviteSecret, context.roomId);
-  return aead.seal(wrapKey, roomKey, inviteAad(context), random);
+) {
+  const salt = encodeFields([stringField(context.roomId)]);
+  const wrapKey = hkdfSha256(inviteSecret, salt, INVITE_KEY_WRAP_INFO, aead.keyLength);
+  const aad = encodeFields([
+    stringField(context.roomId),
+    uint64Field(context.epoch),
+    stringField(context.inviteId),
+  ]);
+  return aead.seal(wrapKey, roomKey, aad, random);
 }
 
 export async function unwrapRoomKeyForInvite(
@@ -42,7 +35,15 @@ export async function unwrapRoomKeyForInvite(
   inviteSecret: Uint8Array,
   wrappedRoomKey: Uint8Array,
   context: InviteWrapContext,
-): Promise<RoomKey> {
-  const wrapKey = inviteWrapKey(aead, inviteSecret, context.roomId);
-  return aead.open(wrapKey, wrappedRoomKey, inviteAad(context));
+) {
+  // Must match wrapRoomKeyForInvite's salt derivation above exactly.
+  const salt = encodeFields([stringField(context.roomId)]);
+  const wrapKey = hkdfSha256(inviteSecret, salt, INVITE_KEY_WRAP_INFO, aead.keyLength);
+  // Must match wrapRoomKeyForInvite's aad derivation above exactly.
+  const aad = encodeFields([
+    stringField(context.roomId),
+    uint64Field(context.epoch),
+    stringField(context.inviteId),
+  ]);
+  return aead.open(wrapKey, wrappedRoomKey, aad);
 }

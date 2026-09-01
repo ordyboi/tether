@@ -4,17 +4,17 @@ export type EncodableField =
   | { readonly kind: "string"; readonly value: string }
   | { readonly kind: "uint64"; readonly value: number | bigint };
 
-export function stringField(value: string): EncodableField {
-  return { kind: "string", value };
+export function stringField(value: string) {
+  return { kind: "string", value } as const;
 }
 
-export function uint64Field(value: number | bigint): EncodableField {
-  return { kind: "uint64", value };
+export function uint64Field(value: number | bigint) {
+  return { kind: "uint64", value } as const;
 }
 
 // Length-prefixes every field so distinct field boundaries can never collide
 // once concatenated (e.g. roomId="a"+epoch=11 vs roomId="a1"+epoch=1).
-export function encodeFields(fields: readonly EncodableField[]): Uint8Array {
+export function encodeFields(fields: readonly EncodableField[]) {
   const parts: Uint8Array[] = [];
   for (const field of fields) {
     const content =

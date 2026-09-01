@@ -11,7 +11,7 @@ import {
   rerandomizeRatchet,
   sealRatcheted,
 } from "./ratchet.js";
-import { AEADS } from "./test-support/aeads.js";
+import { AEADS } from "./constants.js";
 
 describe("ratchet key derivation", () => {
   it("advance is deterministic and moves off the current key", () => {

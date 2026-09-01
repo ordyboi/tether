@@ -11,13 +11,13 @@ export interface LatLng {
   readonly lng: number;
 }
 
-export function projectToMeters(lat: number, lng: number): ProjectedPoint {
+export function projectToMeters(lat: number, lng: number) {
   const x = lng * 111_320 * Math.cos((lat * Math.PI) / 180);
   const y = lat * 110_540;
   return { x, y };
 }
 
-export function unprojectFromMeters(x: number, y: number, refLat: number): LatLng {
+export function unprojectFromMeters(x: number, y: number, refLat: number) {
   const lat = y / 110_540;
   const lng = x / (111_320 * Math.cos((refLat * Math.PI) / 180));
   return { lat, lng };
@@ -28,18 +28,8 @@ export interface CoarsenState {
   readonly currentCellY: number;
 }
 
-function cellCenter(cellX: number, cellY: number): ProjectedPoint {
+function cellCenter(cellX: number, cellY: number) {
   return { x: (cellX + 0.5) * CELL_SIZE_M, y: (cellY + 0.5) * CELL_SIZE_M };
-}
-
-function distanceToCellRect(x: number, y: number, cellX: number, cellY: number): number {
-  const xMin = cellX * CELL_SIZE_M;
-  const xMax = (cellX + 1) * CELL_SIZE_M;
-  const yMin = cellY * CELL_SIZE_M;
-  const yMax = (cellY + 1) * CELL_SIZE_M;
-  const dx = Math.max(xMin - x, 0, x - xMax);
-  const dy = Math.max(yMin - y, 0, y - yMax);
-  return Math.sqrt(dx * dx + dy * dy);
 }
 
 export interface CoarsenProjectedResult {
@@ -48,11 +38,7 @@ export interface CoarsenProjectedResult {
 }
 
 // Pure meter-space cell/hysteresis logic (spec §4).
-export function coarsenProjected(
-  x: number,
-  y: number,
-  state: CoarsenState | null,
-): CoarsenProjectedResult {
+export function coarsenProjected(x: number, y: number, state: CoarsenState | null) {
   const rawCellX = Math.floor(x / CELL_SIZE_M);
   const rawCellY = Math.floor(y / CELL_SIZE_M);
 
@@ -65,7 +51,16 @@ export function coarsenProjected(
     return { state, center: cellCenter(state.currentCellX, state.currentCellY) };
   }
 
-  const overshoot = distanceToCellRect(x, y, state.currentCellX, state.currentCellY);
+  // Checked against the *old* cell's rectangle, not the new one — the sticky
+  // hysteresis band this creates is what defeats boundary flicker (spec §4).
+  const xMin = state.currentCellX * CELL_SIZE_M;
+  const xMax = (state.currentCellX + 1) * CELL_SIZE_M;
+  const yMin = state.currentCellY * CELL_SIZE_M;
+  const yMax = (state.currentCellY + 1) * CELL_SIZE_M;
+  const dx = Math.max(xMin - x, 0, x - xMax);
+  const dy = Math.max(yMin - y, 0, y - yMax);
+  const overshoot = Math.sqrt(dx * dx + dy * dy);
+
   const nextState =
     overshoot >= BUFFER_M ? { currentCellX: rawCellX, currentCellY: rawCellY } : state;
   return { state: nextState, center: cellCenter(nextState.currentCellX, nextState.currentCellY) };
@@ -78,7 +73,7 @@ export interface CoarsenResult {
 
 // Callers pass real GPS fixes, which are never polar; antimeridian wrapping
 // is likewise not built, since neither is a plausible input for this product.
-export function coarsen(lat: number, lng: number, state: CoarsenState | null): CoarsenResult {
+export function coarsen(lat: number, lng: number, state: CoarsenState | null) {
   if (Math.abs(lat) >= 90) {
     throw new Error("coarsen does not support polar latitudes");
   }

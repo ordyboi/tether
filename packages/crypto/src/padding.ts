@@ -2,7 +2,7 @@ const PADDED_BLOCK_LENGTH = 256;
 const LENGTH_PREFIX_BYTES = 2;
 export const MAX_FIX_PAYLOAD_LENGTH = PADDED_BLOCK_LENGTH - LENGTH_PREFIX_BYTES;
 
-export function padFixPlaintext(payload: Uint8Array): Uint8Array {
+export function padFixPlaintext(payload: Uint8Array) {
   if (payload.length > MAX_FIX_PAYLOAD_LENGTH) {
     throw new Error(`payload exceeds max length of ${MAX_FIX_PAYLOAD_LENGTH} bytes`);
   }
@@ -12,7 +12,7 @@ export function padFixPlaintext(payload: Uint8Array): Uint8Array {
   return out;
 }
 
-export function unpadFixPlaintext(padded: Uint8Array): Uint8Array {
+export function unpadFixPlaintext(padded: Uint8Array) {
   if (padded.length !== PADDED_BLOCK_LENGTH) {
     throw new Error(`padded plaintext must be exactly ${PADDED_BLOCK_LENGTH} bytes`);
   }

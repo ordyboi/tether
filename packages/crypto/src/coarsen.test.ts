@@ -33,10 +33,6 @@ describe("coarsen", () => {
     }
   });
 
-  // Regression for the bug where unprojection used the fix's true latitude
-  // instead of the cell centre's: every point inside one cell must coarsen
-  // to the exact same reported point, or the coarse output leaks true
-  // position through its longitude.
   it("every point inside one cell coarsens to the same point", () => {
     const first = coarsen(40.71, -74.006, null);
     let state = first.state;

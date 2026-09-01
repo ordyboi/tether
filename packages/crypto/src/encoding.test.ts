@@ -5,7 +5,6 @@ import { encodeFields, stringField, uint64Field } from "./encoding.js";
 
 describe("encodeFields", () => {
   it("does not collide when naive concatenation would", () => {
-    // Naive "a" + "11" and "a1" + "1" both concatenate to "a11".
     const a = encodeFields([stringField("a"), uint64Field(11)]);
     const b = encodeFields([stringField("a1"), uint64Field(1)]);
 

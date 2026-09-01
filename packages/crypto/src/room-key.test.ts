@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { generateIdentityKeyPair } from "./identity.js";
 import { defaultRandomSource } from "./random.js";
 import { generateRoomKey, unwrapRoomKey, wrapRoomKey } from "./room-key.js";
-import { AEADS } from "./test-support/aeads.js";
+import { AEADS } from "./constants.js";
 
 describe.each(AEADS)("room-key wrap/unwrap under %s", (_name, aead) => {
   const random = defaultRandomSource;

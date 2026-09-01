@@ -13,8 +13,8 @@ type NobleAeadCipher = (
   aad?: Uint8Array,
 ) => { encrypt(plaintext: Uint8Array): Uint8Array; decrypt(sealed: Uint8Array): Uint8Array };
 
-function createNobleAead(cipher: NobleAeadCipher): Aead {
-  return {
+function createNobleAead(cipher: NobleAeadCipher) {
+  const aead: Aead = {
     keyLength: KEY_LENGTH,
     async seal(key, plaintext, aad, random) {
       const nonce = random(NONCE_LENGTH);
@@ -30,6 +30,7 @@ function createNobleAead(cipher: NobleAeadCipher): Aead {
       return cipher(key, nonce, aad).decrypt(body);
     },
   };
+  return aead;
 }
 
 export const aesGcm = createNobleAead(gcm);

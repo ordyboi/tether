@@ -9,6 +9,7 @@ const RATCHET_INIT_INFO = utf8ToBytes("precise-ratchet-init");
 const RATCHET_ADVANCE_INFO = utf8ToBytes("precise-ratchet-advance");
 const EMPTY_SALT = new Uint8Array(0);
 const RATCHET_KEY_LENGTH = 32;
+export const MAX_RATCHET_SKIP = 10_000;
 
 export interface RatchetState {
   readonly key: Uint8Array;
@@ -16,20 +17,17 @@ export interface RatchetState {
   readonly generation: number;
 }
 
-// `generation` is the caller's running count across epoch bumps and manual resets
-// (0 at room creation), mixed into the HKDF salt so re-initializing under an
-// unchanged room key with a bumped generation still yields a fresh chain.
-export function initRatchet(roomKey: RoomKey, authorAlias: string, generation = 0): RatchetState {
+export function initRatchet(roomKey: RoomKey, authorAlias: string, generation = 0) {
   const salt = encodeFields([stringField(authorAlias), uint64Field(generation)]);
   const key = hkdfSha256(roomKey, salt, RATCHET_INIT_INFO, RATCHET_KEY_LENGTH);
   return { key, index: 0, generation };
 }
 
-export function advanceRatchetKey(key: Uint8Array): Uint8Array {
+export function advanceRatchetKey(key: Uint8Array) {
   return hkdfSha256(key, EMPTY_SALT, RATCHET_ADVANCE_INFO, RATCHET_KEY_LENGTH);
 }
 
-export function advanceRatchet(state: RatchetState): RatchetState {
+export function advanceRatchet(state: RatchetState) {
   return {
     key: advanceRatchetKey(state.key),
     index: state.index + 1,
@@ -37,22 +35,11 @@ export function advanceRatchet(state: RatchetState): RatchetState {
   };
 }
 
-export function rerandomizeRatchet(state: RatchetState, random: RandomSource): RatchetState {
+export function rerandomizeRatchet(state: RatchetState, random: RandomSource) {
   return { key: random(RATCHET_KEY_LENGTH), index: 0, generation: state.generation + 1 };
 }
 
-// `targetIndex` arrives from the server (fix.ratchetIndex) and is not trusted
-// for integrity (spec §7); an unbounded skip lets one row pin the device's CPU
-// indefinitely. 10,000 covers roughly a week of catch-up for an on_request room
-// uploading a precise fix per minute (~1,440/day) — comfortably more than any
-// legitimate gap, and cheap to widen later if that assumption is wrong.
-export const MAX_RATCHET_SKIP = 10_000;
-
-export function deriveRatchetKeyAt(
-  grantKey: Uint8Array,
-  grantIndex: number,
-  targetIndex: number,
-): Uint8Array {
+export function deriveRatchetKeyAt(grantKey: Uint8Array, grantIndex: number, targetIndex: number) {
   if (targetIndex < grantIndex) {
     throw new Error("cannot derive a ratchet key at an index before the grant");
   }
@@ -74,24 +61,21 @@ export interface RatchetSealContext {
   readonly index: number;
 }
 
-function ratchetAad(context: RatchetSealContext): Uint8Array {
-  return encodeFields([
-    stringField(context.roomId),
-    stringField(context.authorAlias),
-    uint64Field(context.epoch),
-    uint64Field(context.generation),
-    uint64Field(context.index),
-  ]);
-}
-
 export async function sealRatcheted(
   aead: Aead,
   ratchetKey: Uint8Array,
   plaintext: Uint8Array,
   context: RatchetSealContext,
   random: RandomSource,
-): Promise<Uint8Array> {
-  return aead.seal(ratchetKey, plaintext, ratchetAad(context), random);
+) {
+  const aad = encodeFields([
+    stringField(context.roomId),
+    stringField(context.authorAlias),
+    uint64Field(context.epoch),
+    uint64Field(context.generation),
+    uint64Field(context.index),
+  ]);
+  return aead.seal(ratchetKey, plaintext, aad, random);
 }
 
 export async function openRatcheted(
@@ -99,6 +83,13 @@ export async function openRatcheted(
   ratchetKey: Uint8Array,
   sealed: Uint8Array,
   context: RatchetSealContext,
-): Promise<Uint8Array> {
-  return aead.open(ratchetKey, sealed, ratchetAad(context));
+) {
+  const aad = encodeFields([
+    stringField(context.roomId),
+    stringField(context.authorAlias),
+    uint64Field(context.epoch),
+    uint64Field(context.generation),
+    uint64Field(context.index),
+  ]);
+  return aead.open(ratchetKey, sealed, aad);
 }
