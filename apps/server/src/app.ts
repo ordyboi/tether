@@ -5,11 +5,7 @@ import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { healthRoutes } from "./routes/health.js";
 
-export type BuildAppOptions = {
-  loggerStream?: NodeJS.WritableStream;
-};
-
-export function buildApp(options: BuildAppOptions = {}) {
+export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {}) {
   const app = Fastify({
     logger: {
       stream: options.loggerStream,
