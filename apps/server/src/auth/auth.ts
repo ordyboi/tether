@@ -4,47 +4,20 @@ import { betterAuth } from "better-auth";
 import { anonymous } from "better-auth/plugins";
 
 import { db } from "../db/client.js";
-import { env, trustedOrigins } from "../env.js";
-import { syntheticEmail, syntheticName } from "./synthetic-identity.js";
+import { env } from "../env.js";
+import { SYNTHETIC_NAME, syntheticEmail } from "./synthetic-identity.js";
+
+const googleConfigured = env.GOOGLE_CLIENT_ID.length > 0;
+const appleConfigured = env.APPLE_CLIENT_ID.length > 0;
 
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: trustedOrigins(env.TRUSTED_ORIGINS),
+  trustedOrigins: env.TRUSTED_ORIGINS,
   database: drizzleAdapter(db, { provider: "pg" }),
   advanced: {
     ipAddress: {
       disableIpTracking: true,
-    },
-  },
-  user: {
-    changeEmail: {
-      enabled: false,
-    },
-    additionalFields: {
-      name: {
-        type: "string",
-        required: true,
-        input: false,
-        sortable: true,
-        fieldName: "name",
-        defaultValue: syntheticName,
-      },
-      email: {
-        type: "string",
-        required: true,
-        unique: true,
-        input: false,
-        sortable: true,
-        fieldName: "email",
-        defaultValue: syntheticEmail,
-      },
-      image: {
-        type: "string",
-        required: false,
-        input: false,
-        fieldName: "image",
-      },
     },
   },
   account: {
@@ -54,23 +27,19 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    google: {
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      mapProfileToUser: () => ({
-        name: syntheticName(),
-        email: syntheticEmail(),
-      }),
-    },
-    apple: {
-      clientId: env.APPLE_CLIENT_ID,
-      clientSecret: env.APPLE_CLIENT_SECRET,
-      appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER,
-      mapProfileToUser: () => ({
-        name: syntheticName(),
-        email: syntheticEmail(),
-      }),
-    },
+    ...(googleConfigured && {
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+      },
+    }),
+    ...(appleConfigured && {
+      apple: {
+        clientId: env.APPLE_CLIENT_ID,
+        clientSecret: env.APPLE_CLIENT_SECRET,
+        appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER,
+      },
+    }),
   },
   databaseHooks: {
     user: {
@@ -79,7 +48,7 @@ export const auth = betterAuth({
           return {
             data: {
               ...user,
-              name: syntheticName(),
+              name: SYNTHETIC_NAME,
               email: syntheticEmail(),
               image: null,
               emailVerified: false,

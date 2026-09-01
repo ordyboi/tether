@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -18,7 +17,7 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .$onUpdate(() => new Date())
     .notNull(),
   isAnonymous: boolean("is_anonymous").default(false),
 });
@@ -31,8 +30,12 @@ export const session = pgTable(
     token: text("token").notNull().unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .$onUpdate(() => new Date())
       .notNull(),
+    // Better Auth's core session schema always declares these two fields and
+    // the Drizzle adapter requires a matching column for every declared
+    // field, so they cannot be dropped - the write-time hook in auth.ts is
+    // what actually keeps them null on every insert.
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
@@ -58,10 +61,9 @@ export const account = pgTable(
     accessTokenExpiresAt: timestamp("access_token_expires_at"),
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
     scope: text("scope"),
-    password: text("password"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .$onUpdate(() => new Date())
       .notNull(),
   },
   (table) => [
@@ -80,7 +82,7 @@ export const verification = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .$onUpdate(() => new Date())
       .notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
@@ -108,30 +110,3 @@ export const passkey = pgTable(
     index("passkey_credentialID_idx").on(table.credentialID),
   ],
 );
-
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-  passkeys: many(passkey),
-}));
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
-    fields: [session.userId],
-    references: [user.id],
-  }),
-}));
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id],
-  }),
-}));
-
-export const passkeyRelations = relations(passkey, ({ one }) => ({
-  user: one(user, {
-    fields: [passkey.userId],
-    references: [user.id],
-  }),
-}));

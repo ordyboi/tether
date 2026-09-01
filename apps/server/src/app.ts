@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 
-import { trustedOrigins, env } from "./env.js";
+import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { healthRoutes } from "./routes/health.js";
 
@@ -26,7 +26,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     trustProxy: false,
   });
 
-  app.register(cors, { origin: trustedOrigins(env.TRUSTED_ORIGINS) });
+  app.register(cors, { origin: env.TRUSTED_ORIGINS });
 
   app.register(authRoutes);
   app.register(healthRoutes);

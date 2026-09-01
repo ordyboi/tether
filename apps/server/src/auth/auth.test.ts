@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../app.js";
@@ -36,17 +37,27 @@ function buildUnsignedGoogleIdToken(): string {
   return `${header}.${payload}.unsigned-test-signature`;
 }
 
+function assertDefined<T>(value: T | undefined, message: string): T {
+  expect(value, message).toBeDefined();
+  if (value === undefined) throw new Error(message);
+  return value;
+}
+
+let app: FastifyInstance | null = null;
+
 beforeEach(async () => {
   await truncateAuthTables();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
+  await app?.close();
+  app = null;
 });
 
 describe("Google OAuth sign-in strips real PII from the written rows", () => {
-  it("writes only synthetic identity, nulled tokens, and a null-IP session", async () => {
-    const app = buildApp();
+  it("writes only synthetic identity and nulled tokens on a successful sign-in", async () => {
+    app = buildApp();
 
     const idToken = buildUnsignedGoogleIdToken();
     const realFetch = globalThis.fetch;
@@ -92,24 +103,27 @@ describe("Google OAuth sign-in strips real PII from the written rows", () => {
       },
     });
 
-    await app.close();
-
-    expect(callback.statusCode).toBeLessThan(400);
+    // Better Auth signals a failed OAuth callback with a 302 to its error
+    // page, so a bare status check would pass on a failed sign-in too.
+    // Assert the redirect actually lands on the success callbackURL.
+    expect(callback.statusCode).toBe(302);
+    const location = callback.headers.location;
+    expect(location).not.toContain("error");
+    expect(new URL(String(location), "http://localhost").pathname).toBe("/");
 
     const rows = await db.select().from(userTable);
     expect(rows).toHaveLength(1);
-    const user = rows[0];
-    expect(user).toBeDefined();
-    expect(user?.name).not.toBe(REAL_NAME);
-    expect(user?.name).not.toContain("Real");
-    expect(user?.email).not.toBe(REAL_EMAIL);
-    expect(user?.email).toMatch(/@stripped\.tether\.invalid$/);
-    expect(user?.image).toBeNull();
+    const user = assertDefined(rows[0], "expected the OAuth sign-in to create exactly one user");
+    expect(user.name).not.toBe(REAL_NAME);
+    expect(user.name).not.toContain("Real");
+    expect(user.email).not.toBe(REAL_EMAIL);
+    expect(user.email).toMatch(/@stripped\.tether\.invalid$/);
+    expect(user.image).toBeNull();
 
     const [accountRow] = await db
       .select()
       .from(accountTable)
-      .where(eq(accountTable.userId, user?.id ?? ""));
+      .where(eq(accountTable.userId, user.id));
     expect(accountRow?.accountId).toBe("google-subject-123");
     expect(accountRow?.accessToken).toBeNull();
     expect(accountRow?.refreshToken).toBeNull();
@@ -118,7 +132,7 @@ describe("Google OAuth sign-in strips real PII from the written rows", () => {
     const [sessionRow] = await db
       .select()
       .from(sessionTable)
-      .where(eq(sessionTable.userId, user?.id ?? ""));
+      .where(eq(sessionTable.userId, user.id));
     expect(sessionRow?.ipAddress).toBeNull();
     expect(sessionRow?.userAgent).toBeNull();
   });
