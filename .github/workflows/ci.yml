@@ -8,6 +8,33 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: tether
+          POSTGRES_PASSWORD: tether
+          POSTGRES_DB: tether
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tether"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://tether:tether@localhost:5432/tether
+      BETTER_AUTH_SECRET: ${{ secrets.CI_BETTER_AUTH_SECRET }}
+      BETTER_AUTH_URL: http://localhost:3000
+      TRUSTED_ORIGINS: http://localhost:3000
+      GOOGLE_CLIENT_ID: ${{ secrets.CI_GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.CI_GOOGLE_CLIENT_SECRET }}
+      APPLE_CLIENT_ID: ${{ secrets.CI_APPLE_CLIENT_ID }}
+      APPLE_CLIENT_SECRET: ${{ secrets.CI_APPLE_CLIENT_SECRET }}
+      APPLE_APP_BUNDLE_IDENTIFIER: com.tether.app
+      PASSKEY_RP_ID: localhost
+      PASSKEY_RP_NAME: Tether
+      PASSKEY_ORIGIN: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,4 +45,5 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
-      - run: npm test -w mobile
+      - run: npm run db:push -w server
+      - run: npm test
