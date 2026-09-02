@@ -28,7 +28,10 @@ describe("sweeper worker", () => {
 
   it("processes a sweep job through redis and removes expired rows", async () => {
     const room = await seedRoom(db);
-    const expired = await seedInvite(db, { roomId: room.id, expiresAt: new Date(Date.now() - 60_000) });
+    const expired = await seedInvite(db, {
+      roomId: room.id,
+      expiresAt: new Date(Date.now() - 60_000),
+    });
 
     const completed = new Promise<void>((resolve, reject) => {
       worker.on("completed", () => resolve());

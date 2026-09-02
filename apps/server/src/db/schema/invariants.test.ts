@@ -5,6 +5,10 @@ import { db } from "../client.js";
 
 const TIMESTAMP_TYPES = ["timestamp without time zone", "timestamp with time zone"];
 
+function isTimestampType(value: unknown) {
+  return typeof value === "string" && TIMESTAMP_TYPES.includes(value);
+}
+
 async function timestampColumns(tableName: string) {
   const result = await db.execute(sql`
     SELECT column_name, data_type
@@ -13,8 +17,8 @@ async function timestampColumns(tableName: string) {
   `);
 
   return result.rows
-    .filter((row) => TIMESTAMP_TYPES.includes(row.data_type))
-    .map((row) => row.column_name)
+    .filter((row) => isTimestampType(row.data_type))
+    .map((row) => String(row.column_name))
     .sort();
 }
 
@@ -29,9 +33,12 @@ async function hasColumn(tableName: string, columnName: string) {
 }
 
 describe("alias, not user id", () => {
-  it.each(["fix", "precision_request", "precision_grant"])("%s has no user_id column", async (tableName) => {
-    expect(await hasColumn(tableName, "user_id")).toBe(false);
-  });
+  it.each(["fix", "precision_request", "precision_grant"])(
+    "%s has no user_id column",
+    async (tableName) => {
+      expect(await hasColumn(tableName, "user_id")).toBe(false);
+    },
+  );
 });
 
 describe("no blanket timestamp mixin", () => {

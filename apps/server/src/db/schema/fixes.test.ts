@@ -28,7 +28,8 @@ describe("fix schema", () => {
 
     const timestampColumns = result.rows.filter(
       (row) =>
-        row.data_type === "timestamp without time zone" || row.data_type === "timestamp with time zone",
+        row.data_type === "timestamp without time zone" ||
+        row.data_type === "timestamp with time zone",
     );
 
     expect(timestampColumns.map((row) => row.column_name)).toEqual(["server_received_at"]);

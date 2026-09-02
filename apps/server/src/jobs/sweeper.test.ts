@@ -42,7 +42,10 @@ describe("runSweeper", () => {
 
     // --- invites ---
     const inviteRoom = await seedRoom(db);
-    const expiredInvite = await seedInvite(db, { roomId: inviteRoom.id, expiresAt: minutesBefore(1) });
+    const expiredInvite = await seedInvite(db, {
+      roomId: inviteRoom.id,
+      expiresAt: minutesBefore(1),
+    });
     const liveInvite = await seedInvite(db, { roomId: inviteRoom.id, expiresAt: minutesAfter(60) });
     deleted.push({ table: "invite", id: expiredInvite.id });
     kept.push({ table: "invite", id: liveInvite.id });
@@ -68,7 +71,11 @@ describe("runSweeper", () => {
     const envelopeRoom = await seedRoom(db, { nameEpoch: 2, currentEpoch: 3 });
     const envelopeRoomMember = await seedMembership(db, { roomId: envelopeRoom.id });
     for (const epoch of [0, 1, 2, 3]) {
-      await seedEpoch(db, { roomId: envelopeRoom.id, epoch, reason: epoch === 0 ? "created" : "member_joined" });
+      await seedEpoch(db, {
+        roomId: envelopeRoom.id,
+        epoch,
+        reason: epoch === 0 ? "created" : "member_joined",
+      });
     }
 
     const revokedDevice = await seedDevice(db, { revokedAt: new Date() });
@@ -77,13 +84,30 @@ describe("runSweeper", () => {
       epoch: 3,
       deviceId: revokedDevice.id,
     });
-    deleted.push({ table: "room_key_envelope", id: `${revokedEnvelope.roomId}:${revokedEnvelope.epoch}:${revokedEnvelope.deviceId}` });
+    deleted.push({
+      table: "room_key_envelope",
+      id: `${revokedEnvelope.roomId}:${revokedEnvelope.epoch}:${revokedEnvelope.deviceId}`,
+    });
 
     const supersededDevice = await seedDevice(db);
-    const supersededOld = await seedEnvelope(db, { roomId: envelopeRoom.id, epoch: 0, deviceId: supersededDevice.id });
-    const supersededNewest = await seedEnvelope(db, { roomId: envelopeRoom.id, epoch: 3, deviceId: supersededDevice.id });
-    deleted.push({ table: "room_key_envelope", id: `${supersededOld.roomId}:${supersededOld.epoch}:${supersededOld.deviceId}` });
-    kept.push({ table: "room_key_envelope", id: `${supersededNewest.roomId}:${supersededNewest.epoch}:${supersededNewest.deviceId}` });
+    const supersededOld = await seedEnvelope(db, {
+      roomId: envelopeRoom.id,
+      epoch: 0,
+      deviceId: supersededDevice.id,
+    });
+    const supersededNewest = await seedEnvelope(db, {
+      roomId: envelopeRoom.id,
+      epoch: 3,
+      deviceId: supersededDevice.id,
+    });
+    deleted.push({
+      table: "room_key_envelope",
+      id: `${supersededOld.roomId}:${supersededOld.epoch}:${supersededOld.deviceId}`,
+    });
+    kept.push({
+      table: "room_key_envelope",
+      id: `${supersededNewest.roomId}:${supersededNewest.epoch}:${supersededNewest.deviceId}`,
+    });
 
     const survivedByFixDevice = await seedDevice(db);
     const survivedByFixOld = await seedEnvelope(db, {
@@ -102,14 +126,34 @@ describe("runSweeper", () => {
       epoch: 1,
       serverReceivedAt: new Date(NOW.getTime() - MINUTE),
     });
-    kept.push({ table: "room_key_envelope", id: `${survivedByFixOld.roomId}:${survivedByFixOld.epoch}:${survivedByFixOld.deviceId}` });
-    kept.push({ table: "room_key_envelope", id: `${survivedByFixNewest.roomId}:${survivedByFixNewest.epoch}:${survivedByFixNewest.deviceId}` });
+    kept.push({
+      table: "room_key_envelope",
+      id: `${survivedByFixOld.roomId}:${survivedByFixOld.epoch}:${survivedByFixOld.deviceId}`,
+    });
+    kept.push({
+      table: "room_key_envelope",
+      id: `${survivedByFixNewest.roomId}:${survivedByFixNewest.epoch}:${survivedByFixNewest.deviceId}`,
+    });
 
     const nameEpochDevice = await seedDevice(db);
-    const nameEpochOld = await seedEnvelope(db, { roomId: envelopeRoom.id, epoch: 2, deviceId: nameEpochDevice.id });
-    const nameEpochNewest = await seedEnvelope(db, { roomId: envelopeRoom.id, epoch: 3, deviceId: nameEpochDevice.id });
-    kept.push({ table: "room_key_envelope", id: `${nameEpochOld.roomId}:${nameEpochOld.epoch}:${nameEpochOld.deviceId}` });
-    kept.push({ table: "room_key_envelope", id: `${nameEpochNewest.roomId}:${nameEpochNewest.epoch}:${nameEpochNewest.deviceId}` });
+    const nameEpochOld = await seedEnvelope(db, {
+      roomId: envelopeRoom.id,
+      epoch: 2,
+      deviceId: nameEpochDevice.id,
+    });
+    const nameEpochNewest = await seedEnvelope(db, {
+      roomId: envelopeRoom.id,
+      epoch: 3,
+      deviceId: nameEpochDevice.id,
+    });
+    kept.push({
+      table: "room_key_envelope",
+      id: `${nameEpochOld.roomId}:${nameEpochOld.epoch}:${nameEpochOld.deviceId}`,
+    });
+    kept.push({
+      table: "room_key_envelope",
+      id: `${nameEpochNewest.roomId}:${nameEpochNewest.epoch}:${nameEpochNewest.deviceId}`,
+    });
 
     // --- precision requests never expire ---
     const requestRoom = await seedRoom(db);
@@ -138,10 +182,16 @@ describe("runSweeper", () => {
       expect(survives, `${row.table} ${row.id} should have been deleted`).toBe(false);
     }
 
-    const [requestStillThere] = await db.select().from(precisionRequest).where(eq(precisionRequest.id, oldRequest.id));
+    const [requestStillThere] = await db
+      .select()
+      .from(precisionRequest)
+      .where(eq(precisionRequest.id, oldRequest.id));
     expect(requestStillThere).toBeDefined();
 
-    const [guestStillThere] = await db.select().from(membership).where(eq(membership.id, guestMembership.id));
+    const [guestStillThere] = await db
+      .select()
+      .from(membership)
+      .where(eq(membership.id, guestMembership.id));
     expect(guestStillThere).toBeDefined();
 
     const second = await runSweeper(db, NOW);

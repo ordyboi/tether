@@ -15,10 +15,18 @@ describe("precision_request pending uniqueness", () => {
     const from = await seedMembership(db, { roomId: room.id });
     const to = await seedMembership(db, { roomId: room.id });
 
-    await seedPrecisionRequest(db, { roomId: room.id, fromAlias: from.memberAlias, toAlias: to.memberAlias });
+    await seedPrecisionRequest(db, {
+      roomId: room.id,
+      fromAlias: from.memberAlias,
+      toAlias: to.memberAlias,
+    });
 
     await expect(
-      seedPrecisionRequest(db, { roomId: room.id, fromAlias: from.memberAlias, toAlias: to.memberAlias }),
+      seedPrecisionRequest(db, {
+        roomId: room.id,
+        fromAlias: from.memberAlias,
+        toAlias: to.memberAlias,
+      }),
     ).rejects.toThrow();
   });
 
@@ -33,10 +41,17 @@ describe("precision_request pending uniqueness", () => {
       toAlias: to.memberAlias,
     });
 
-    await db.update(precisionRequest).set({ status: "denied" }).where(eq(precisionRequest.id, first.id));
+    await db
+      .update(precisionRequest)
+      .set({ status: "denied" })
+      .where(eq(precisionRequest.id, first.id));
 
     await expect(
-      seedPrecisionRequest(db, { roomId: room.id, fromAlias: from.memberAlias, toAlias: to.memberAlias }),
+      seedPrecisionRequest(db, {
+        roomId: room.id,
+        fromAlias: from.memberAlias,
+        toAlias: to.memberAlias,
+      }),
     ).resolves.toBeDefined();
   });
 
@@ -46,10 +61,18 @@ describe("precision_request pending uniqueness", () => {
     const b = await seedMembership(db, { roomId: room.id });
     const c = await seedMembership(db, { roomId: room.id });
 
-    await seedPrecisionRequest(db, { roomId: room.id, fromAlias: a.memberAlias, toAlias: b.memberAlias });
+    await seedPrecisionRequest(db, {
+      roomId: room.id,
+      fromAlias: a.memberAlias,
+      toAlias: b.memberAlias,
+    });
 
     await expect(
-      seedPrecisionRequest(db, { roomId: room.id, fromAlias: a.memberAlias, toAlias: c.memberAlias }),
+      seedPrecisionRequest(db, {
+        roomId: room.id,
+        fromAlias: a.memberAlias,
+        toAlias: c.memberAlias,
+      }),
     ).resolves.toBeDefined();
   });
 });

@@ -22,9 +22,6 @@ export const auth = betterAuth({
   trustedOrigins: env.TRUSTED_ORIGINS,
   database: drizzleAdapter(db, { provider: "pg", schema }),
   advanced: {
-    database: {
-      generateId: "uuid",
-    },
     ipAddress: {
       disableIpTracking: true,
     },

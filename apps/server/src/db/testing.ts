@@ -48,7 +48,10 @@ export async function seedUser(db: AppDatabase, overrides: Partial<typeof user.$
   return assertRow(row);
 }
 
-export async function seedDevice(db: AppDatabase, overrides: Partial<typeof device.$inferInsert> = {}) {
+export async function seedDevice(
+  db: AppDatabase,
+  overrides: Partial<typeof device.$inferInsert> = {},
+) {
   const [row] = await db
     .insert(device)
     .values({
@@ -110,7 +113,11 @@ export async function seedMembership(
 
 export async function seedEnvelope(
   db: AppDatabase,
-  overrides: Partial<typeof roomKeyEnvelope.$inferInsert> & { roomId: string; epoch: number; deviceId: string },
+  overrides: Partial<typeof roomKeyEnvelope.$inferInsert> & {
+    roomId: string;
+    epoch: number;
+    deviceId: string;
+  },
 ) {
   const [row] = await db
     .insert(roomKeyEnvelope)
@@ -137,7 +144,10 @@ export async function seedFix(
   return assertRow(row);
 }
 
-export async function seedInvite(db: AppDatabase, overrides: Partial<typeof invite.$inferInsert> & { roomId: string }) {
+export async function seedInvite(
+  db: AppDatabase,
+  overrides: Partial<typeof invite.$inferInsert> & { roomId: string },
+) {
   const [row] = await db
     .insert(invite)
     .values({
@@ -155,7 +165,11 @@ export async function seedInvite(db: AppDatabase, overrides: Partial<typeof invi
 
 export async function seedPrecisionRequest(
   db: AppDatabase,
-  overrides: Partial<typeof precisionRequest.$inferInsert> & { roomId: string; fromAlias: string; toAlias: string },
+  overrides: Partial<typeof precisionRequest.$inferInsert> & {
+    roomId: string;
+    fromAlias: string;
+    toAlias: string;
+  },
 ) {
   const [row] = await db
     .insert(precisionRequest)
@@ -169,7 +183,11 @@ export async function seedPrecisionRequest(
 
 export async function seedPrecisionGrant(
   db: AppDatabase,
-  overrides: Partial<typeof precisionGrant.$inferInsert> & { roomId: string; fromAlias: string; toAlias: string },
+  overrides: Partial<typeof precisionGrant.$inferInsert> & {
+    roomId: string;
+    fromAlias: string;
+    toAlias: string;
+  },
 ) {
   const [row] = await db
     .insert(precisionGrant)
