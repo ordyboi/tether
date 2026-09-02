@@ -22,8 +22,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: postgres://tether:tether@localhost:5432/tether
+      REDIS_URL: redis://localhost:6379
+      SWEEPER_CRON: "*/15 * * * *"
       BETTER_AUTH_SECRET: ${{ secrets.CI_BETTER_AUTH_SECRET }}
       BETTER_AUTH_URL: http://localhost:3000
       TRUSTED_ORIGINS: http://localhost:3000
