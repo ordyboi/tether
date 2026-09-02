@@ -22,7 +22,7 @@ export async function runSweeper(db: AppDatabase, now = new Date()) {
     const supersedingEnvelope = alias(roomKeyEnvelope, "superseding_envelope");
 
     // a superseded envelope survives if a fix still needs its epoch, or the epoch is the room's
-    // nameEpoch — either guard missing strands otherwise-readable data (PLAN.md §3)
+    // nameEpoch — either guard missing strands otherwise-readable data
     const envelopes = await tx.delete(roomKeyEnvelope).where(
       or(
         exists(

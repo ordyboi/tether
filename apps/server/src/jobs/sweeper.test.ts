@@ -169,8 +169,8 @@ describe("runSweeper", () => {
     expectEnvelope(assertions, nameEpochNewest, true);
 
     // ordering: the fix at epoch 4 is already past retention, so it only stops protecting this
-    // envelope if the fix sweep has run first (PLAN.md §3) — this is the case that catches the
-    // two delete steps being reordered, which nothing else here depends on.
+    // envelope if the fix sweep has run first — this is the case that catches the two delete
+    // steps being reordered, which nothing else here depends on.
     const orderingDevice = await seedDevice(db);
     const orderingOld = await seedEnvelope(db, {
       roomId: envelopeRoom.id,
