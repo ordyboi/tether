@@ -4,7 +4,11 @@ import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
-import { deviceCreateSchema } from "./schemas.js";
+import { deviceCreateSchema, toBase64 } from "./schemas.js";
+
+function serializeDevice(row: typeof device.$inferSelect) {
+  return { ...row, identityPublicKey: toBase64(row.identityPublicKey) };
+}
 
 export function deviceRoutes(app: FastifyInstance) {
   app.post("/devices", { preHandler: requireSession }, async (request, reply) => {
@@ -21,7 +25,7 @@ export function deviceRoutes(app: FastifyInstance) {
           .status(409)
           .send({ error: "identityPublicKey already registered to another user" });
       }
-      return reply.status(200).send(existing);
+      return reply.status(200).send(serializeDevice(existing));
     }
 
     const [created] = await db
@@ -30,10 +34,13 @@ export function deviceRoutes(app: FastifyInstance) {
         userId: request.userId,
         identityPublicKey: body.identityPublicKey,
         platform: body.platform,
-        ...(body.pushToken === undefined ? {} : { pushToken: body.pushToken }),
+        pushToken: body.pushToken,
       })
       .returning();
+    if (!created) {
+      throw new Error("device insert returned no row");
+    }
 
-    return reply.status(201).send(created);
+    return reply.status(201).send(serializeDevice(created));
   });
 }

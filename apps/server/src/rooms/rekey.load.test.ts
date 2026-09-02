@@ -21,6 +21,15 @@ import { createSignedInUser } from "../auth/testing.js";
 import { db } from "../db/client.js";
 import { roomKeyEnvelope } from "../db/schema/rooms.js";
 import { seedDevice, seedMembership, seedRoom, seedUser } from "../db/testing.js";
+import { json } from "../test-utils.js";
+
+interface DeviceResponse {
+  id: string;
+}
+
+interface RedeemResponse {
+  newEpoch: number;
+}
 
 let app: FastifyInstance | null = null;
 
@@ -87,7 +96,7 @@ async function runChurnCase(householdDevices: number) {
       platform: "ios",
     },
   });
-  const joinerDeviceId = (joinerDeviceResponse.json() as { id: string }).id;
+  const joinerDeviceId = json<DeviceResponse>(joinerDeviceResponse).id;
 
   const wrapTargets = [...existing, { deviceId: joinerDeviceId, identity: joinerIdentity }];
   const newEpoch = 1;
@@ -117,7 +126,6 @@ async function runChurnCase(householdDevices: number) {
     payload: {
       token: inviteToken,
       displayNameCiphertext: Buffer.from("member").toString("base64"),
-      deviceId: joinerDeviceId,
       expectedEpoch: 0,
       nameCiphertext: room.nameCiphertext.toString("base64"),
       envelopes,
@@ -126,7 +134,7 @@ async function runChurnCase(householdDevices: number) {
   const serverMs = performance.now() - serverStart;
 
   expect(response.statusCode).toBe(200);
-  expect(response.json().newEpoch).toBe(newEpoch);
+  expect(json<RedeemResponse>(response).newEpoch).toBe(newEpoch);
 
   const writtenEnvelopes = await db
     .select()

@@ -29,15 +29,19 @@ export class ConflictError extends HttpError {
   }
 }
 
-export class StaleEpochError extends HttpError {
+export class StaleEpochError extends ConflictError {
   constructor(expectedEpoch: number, currentEpoch: number) {
-    super(409, "expectedEpoch does not match room.currentEpoch", { expectedEpoch, currentEpoch });
+    super("expectedEpoch does not match room.currentEpoch", { expectedEpoch, currentEpoch });
   }
 }
 
 export class WrapSetMismatchError extends HttpError {
-  constructor(missing: string[], extra: string[]) {
-    super(400, "envelope device set does not match the required wrap set", { missing, extra });
+  constructor(missing: string[], extra: string[], duplicate: string[] = []) {
+    super(400, "envelope device set does not match the required wrap set", {
+      missing,
+      extra,
+      duplicate,
+    });
   }
 }
 

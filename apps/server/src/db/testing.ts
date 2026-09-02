@@ -2,15 +2,13 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { getTableName, sql } from "drizzle-orm";
 
-import type { db as clientDb } from "./client.js";
+import type { AppDatabase } from "./client.js";
 import { user } from "./schema/auth.js";
 import { device } from "./schema/devices.js";
 import { fix } from "./schema/fixes.js";
 import { invite, membership } from "./schema/membership.js";
 import { precisionGrant, precisionRequest } from "./schema/precision.js";
 import { room, roomEpoch, roomKeyEnvelope } from "./schema/rooms.js";
-
-type AppDatabase = typeof clientDb;
 
 // order matters for TRUNCATE ... CASCADE below: children before the tables they reference
 const APP_TABLES = [

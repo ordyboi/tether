@@ -4,11 +4,15 @@ import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "../db/client.js";
-import { membership } from "../db/schema/membership.js";
+import { invite, membership } from "../db/schema/membership.js";
 import { roomKeyEnvelope } from "../db/schema/rooms.js";
 import { seedDevice, seedEpoch, seedMembership, seedRoom, seedUser } from "../db/testing.js";
 import { StaleEpochError, WrapSetMismatchError } from "./errors.js";
-import { applyRekey, createRoom } from "./rekey.js";
+import { type ApplyRekeyParams, createRoom, runRekey } from "./rekey.js";
+
+function applyRekey(params: ApplyRekeyParams) {
+  return db.transaction((tx) => runRekey(tx, params));
+}
 
 describe("createRoom", () => {
   it("writes room, epoch 0, the owner membership and the owner's epoch-0 envelope", async () => {
@@ -74,7 +78,7 @@ describe("applyRekey", () => {
     const joiner = await seedUser(db);
     const joinerDevice = await seedDevice(db, { userId: joiner.id });
 
-    const result = await applyRekey(db, {
+    const result = await applyRekey({
       roomId: seededRoom.id,
       expectedEpoch: 0,
       reason: "member_joined",
@@ -116,7 +120,7 @@ describe("applyRekey", () => {
       role: "member",
       joinedEpoch: 0,
     });
-    await applyRekey(db, {
+    await applyRekey({
       roomId: seededRoom.id,
       expectedEpoch: 0,
       reason: "member_joined",
@@ -130,7 +134,7 @@ describe("applyRekey", () => {
       },
     });
 
-    const result = await applyRekey(db, {
+    const result = await applyRekey({
       roomId: seededRoom.id,
       expectedEpoch: 1,
       reason: "member_removed",
@@ -155,7 +159,7 @@ describe("applyRekey", () => {
   it("409s when expectedEpoch is stale", async () => {
     const { room: seededRoom, ownerDevice } = await seedRoomAtEpochZero();
     await expect(
-      applyRekey(db, {
+      applyRekey({
         roomId: seededRoom.id,
         expectedEpoch: 5,
         reason: "member_joined",
@@ -169,7 +173,7 @@ describe("applyRekey", () => {
   it("400s when the submitted wrap set is missing a required device", async () => {
     const { room: seededRoom } = await seedRoomAtEpochZero();
     await expect(
-      applyRekey(db, {
+      applyRekey({
         roomId: seededRoom.id,
         expectedEpoch: 0,
         reason: "member_joined",
@@ -183,7 +187,7 @@ describe("applyRekey", () => {
   it("400s when the submitted wrap set includes a device outside the required set", async () => {
     const { room: seededRoom, ownerDevice } = await seedRoomAtEpochZero();
     await expect(
-      applyRekey(db, {
+      applyRekey({
         roomId: seededRoom.id,
         expectedEpoch: 0,
         reason: "member_joined",
@@ -195,5 +199,51 @@ describe("applyRekey", () => {
         async mutateMembership() {},
       }),
     ).rejects.toBeInstanceOf(WrapSetMismatchError);
+  });
+
+  it("400s a wrap set with a duplicate deviceId instead of violating the envelope primary key", async () => {
+    const { room: seededRoom, ownerDevice } = await seedRoomAtEpochZero();
+    await expect(
+      applyRekey({
+        roomId: seededRoom.id,
+        expectedEpoch: 0,
+        reason: "member_joined",
+        nameCiphertext: randomBytes(32),
+        envelopes: [
+          { deviceId: ownerDevice.id, wrappedKey: randomBytes(48) },
+          { deviceId: ownerDevice.id, wrappedKey: randomBytes(48) },
+        ],
+        async mutateMembership() {},
+      }),
+    ).rejects.toBeInstanceOf(WrapSetMismatchError);
+  });
+
+  it("revokes every outstanding invite for the room on a bump", async () => {
+    const { room: seededRoom, ownerDevice } = await seedRoomAtEpochZero();
+    const [inviteRow] = await db
+      .insert(invite)
+      .values({
+        roomId: seededRoom.id,
+        tokenHash: "a".repeat(64),
+        grantsRole: "member",
+        wrappedRoomKey: randomBytes(48),
+        wrappedRoomKeyEpoch: 0,
+        createdBy: (await seedUser(db)).id,
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+      .returning();
+    if (!inviteRow) throw new Error("expected invite insert to return a row");
+
+    await applyRekey({
+      roomId: seededRoom.id,
+      expectedEpoch: 0,
+      reason: "member_joined",
+      nameCiphertext: randomBytes(32),
+      envelopes: [{ deviceId: ownerDevice.id, wrappedKey: randomBytes(48) }],
+      async mutateMembership() {},
+    });
+
+    const [afterBump] = await db.select().from(invite).where(eq(invite.id, inviteRow.id));
+    expect(afterBump?.revokedAt).not.toBeNull();
   });
 });

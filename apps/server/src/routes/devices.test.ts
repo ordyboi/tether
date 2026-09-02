@@ -29,6 +29,21 @@ describe("POST /devices", () => {
     expect(response.statusCode).toBe(201);
     const body = response.json();
     expect(body.platform).toBe("android");
+    expect(body.identityPublicKey).toBe(identityPublicKey);
+  });
+
+  it("400s an identityPublicKey that is not exactly 32 bytes", async () => {
+    app = buildApp();
+    const { cookie } = await createSignedInUser();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/devices",
+      headers: { cookie },
+      payload: { identityPublicKey: randomBytes(3).toString("base64"), platform: "ios" },
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it("returns the existing row when the caller re-registers the same key", async () => {

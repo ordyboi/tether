@@ -5,16 +5,15 @@ import type { FastifyInstance } from "fastify";
 
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
-import { device } from "../db/schema/devices.js";
 import { membership } from "../db/schema/membership.js";
 import { room } from "../db/schema/rooms.js";
 import { ForbiddenError, NotFoundError, sendHttpError } from "../rooms/errors.js";
 import { createRoom, listActiveDevices, runRekey } from "../rooms/rekey.js";
-import { removalSchema, roomCreateSchema } from "./schemas.js";
+import { removalSchema, roomCreateSchema, roomIdParamSchema, toBase64 } from "./schemas.js";
 
 async function requireActiveMembership(roomId: string, userId: string) {
   const [row] = await db
-    .select()
+    .select({ id: membership.id })
     .from(membership)
     .where(
       and(
@@ -26,7 +25,10 @@ async function requireActiveMembership(roomId: string, userId: string) {
   if (!row) {
     throw new NotFoundError("room not found");
   }
-  return row;
+}
+
+function serializeRoom(row: typeof room.$inferSelect) {
+  return { ...row, nameCiphertext: toBase64(row.nameCiphertext) };
 }
 
 export function roomRoutes(app: FastifyInstance) {
@@ -47,7 +49,7 @@ export function roomRoutes(app: FastifyInstance) {
       .innerJoin(room, eq(room.id, membership.roomId))
       .where(and(eq(membership.userId, request.userId), isNull(membership.removedAt)));
 
-    return { rooms: rows };
+    return { rooms: rows.map((row) => ({ ...row, nameCiphertext: toBase64(row.nameCiphertext) })) };
   });
 
   app.post("/rooms", { preHandler: requireSession }, async (request, reply) => {
@@ -56,43 +58,44 @@ export function roomRoutes(app: FastifyInstance) {
 
     try {
       const created = await createRoom(db, {
-        ...(body.roomId === undefined ? {} : { roomId: body.roomId }),
+        roomId: body.roomId,
         ownerId: request.userId,
         memberAlias,
         nameCiphertext: body.nameCiphertext,
         displayNameCiphertext: body.displayNameCiphertext,
         precisionPolicy: body.precisionPolicy,
-        ...(body.approximateRadiusM === undefined
-          ? {}
-          : { approximateRadiusM: body.approximateRadiusM }),
+        approximateRadiusM: body.approximateRadiusM,
         envelopes: body.envelopes,
       });
-      return reply.status(201).send({ room: created, memberAlias });
+      return reply.status(201).send({ room: serializeRoom(created), memberAlias });
     } catch (error) {
       return sendHttpError(reply, error);
     }
   });
 
   app.get("/rooms/:roomId/devices", { preHandler: requireSession }, async (request, reply) => {
-    const { roomId } = request.params as { roomId: string };
     try {
+      const { roomId } = roomIdParamSchema.parse(request.params);
       await requireActiveMembership(roomId, request.userId);
       const [roomRow] = await db.select().from(room).where(eq(room.id, roomId));
       if (!roomRow) {
         throw new NotFoundError("room not found");
       }
       const devices = await listActiveDevices(db, roomId, roomRow.currentEpoch);
-      return { epoch: roomRow.currentEpoch, devices };
+      return {
+        epoch: roomRow.currentEpoch,
+        devices: devices.map((d) => ({ ...d, identityPublicKey: toBase64(d.identityPublicKey) })),
+      };
     } catch (error) {
       return sendHttpError(reply, error);
     }
   });
 
   app.post("/rooms/:roomId/removals", { preHandler: requireSession }, async (request, reply) => {
-    const { roomId } = request.params as { roomId: string };
-    const body = removalSchema.parse(request.body);
-
     try {
+      const { roomId } = roomIdParamSchema.parse(request.params);
+      const body = removalSchema.parse(request.body);
+
       const result = await db.transaction(async (tx) => {
         const [acting] = await tx
           .select()
@@ -126,7 +129,8 @@ export function roomRoutes(app: FastifyInstance) {
         }
 
         const reason = target.role === "guest" ? "guest_removed" : "member_removed";
-        const rekeyResult = await runRekey(tx, {
+        // No device.revokedAt here: it's a global column, and removedAt above already stops this room's envelopes.
+        return runRekey(tx, {
           roomId,
           expectedEpoch: body.expectedEpoch,
           reason,
@@ -139,23 +143,6 @@ export function roomRoutes(app: FastifyInstance) {
               .where(eq(membership.id, target.id));
           },
         });
-
-        // device.revokedAt is global (schema has no room-scoped revocation), so only revoke when
-        // the removed user holds no other active membership anywhere — otherwise their other
-        // rooms' envelopes would stop too. This room's envelopes already stopped the moment
-        // `removedAt` was set above; revocation here is belt-and-braces for the sweeper.
-        const [otherMembership] = await tx
-          .select({ id: membership.id })
-          .from(membership)
-          .where(and(eq(membership.userId, target.userId), isNull(membership.removedAt)));
-        if (!otherMembership) {
-          await tx
-            .update(device)
-            .set({ revokedAt: new Date() })
-            .where(eq(device.userId, target.userId));
-        }
-
-        return rekeyResult;
       });
 
       return reply.status(200).send(result);

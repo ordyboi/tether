@@ -5,6 +5,26 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
 import { createSignedInUser } from "../auth/testing.js";
+import { json } from "../test-utils.js";
+
+interface DeviceResponse {
+  id: string;
+}
+
+interface RoomCreateResponse {
+  room: { id: string };
+  memberAlias: string;
+}
+
+interface InviteLookupResponse {
+  roomId: string;
+  wrappedRoomKey: string;
+}
+
+interface RedeemResponse {
+  newEpoch: number;
+  memberAlias: string;
+}
 
 let app: FastifyInstance | null = null;
 
@@ -20,7 +40,7 @@ async function registerDevice(app: FastifyInstance, cookie: string) {
     headers: { cookie },
     payload: { identityPublicKey: randomBytes(32).toString("base64"), platform: "ios" },
   });
-  return response.json() as { id: string };
+  return json<DeviceResponse>(response);
 }
 
 async function createRoom(app: FastifyInstance, cookie: string, ownerDeviceId: string) {
@@ -35,7 +55,7 @@ async function createRoom(app: FastifyInstance, cookie: string, ownerDeviceId: s
       envelopes: [{ deviceId: ownerDeviceId, wrappedKey: randomBytes(48).toString("base64") }],
     },
   });
-  return response.json() as { room: { id: string }; memberAlias: string };
+  return json<RoomCreateResponse>(response);
 }
 
 function tokenAndHash() {
@@ -50,6 +70,7 @@ async function createInvite(
   overrides: Partial<{ grantsRole: string; expiresAt: string; tokenHash: string }> = {},
 ) {
   const { token, tokenHash } = tokenAndHash();
+  const wrappedRoomKey = randomBytes(48);
   const response = await app.inject({
     method: "POST",
     url: `/rooms/${roomId}/invites`,
@@ -57,12 +78,12 @@ async function createInvite(
     payload: {
       tokenHash: overrides.tokenHash ?? tokenHash,
       grantsRole: overrides.grantsRole ?? "member",
-      wrappedRoomKey: randomBytes(48).toString("base64"),
+      wrappedRoomKey: wrappedRoomKey.toString("base64"),
       wrappedRoomKeyEpoch: 0,
       expiresAt: overrides.expiresAt ?? new Date(Date.now() + 60_000).toISOString(),
     },
   });
-  return { response, token };
+  return { response, token, wrappedRoomKey };
 }
 
 describe("POST /rooms/:roomId/invites", () => {
@@ -87,7 +108,7 @@ describe("POST /rooms/:roomId/invites", () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it("403s an admin trying to grant the admin role", async () => {
+  it("owner can grant admin", async () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
@@ -96,20 +117,73 @@ describe("POST /rooms/:roomId/invites", () => {
     const { response } = await createInvite(app, owner.cookie, created.room.id, {
       grantsRole: "admin",
     });
-    // the owner can grant admin; this only fails once the granter is an admin, exercised via
-    // the no-backfill test's fuller multi-member scenario. Here we just assert owner-grants-admin
-    // succeeds, since standing up an admin caller needs a redemption round trip.
     expect(response.statusCode).toBe(201);
   });
-});
 
-describe("POST /invites/lookup", () => {
-  it("returns invite metadata for a live token", async () => {
+  it("400s a grantsRole of owner — never a valid grant", async () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { token } = await createInvite(app, owner.cookie, created.room.id);
+
+    const { response } = await createInvite(app, owner.cookie, created.room.id, {
+      grantsRole: "owner",
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("400s a tokenHash that is not a 64-character hex digest", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+
+    const { response } = await createInvite(app, owner.cookie, created.room.id, {
+      tokenHash: "not-a-real-hash",
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("400s a malformed (non-UUID) roomId", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/rooms/not-a-uuid/invites",
+      headers: { cookie: owner.cookie },
+      payload: {
+        tokenHash: "a".repeat(64),
+        grantsRole: "member",
+        wrappedRoomKey: randomBytes(48).toString("base64"),
+        wrappedRoomKeyEpoch: 0,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("400s an expiresAt further than the max TTL from now", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+
+    const { response } = await createInvite(app, owner.cookie, created.room.id, {
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    expect(response.statusCode).toBe(400);
+  });
+});
+
+describe("POST /invites/lookup", () => {
+  it("returns invite metadata for a live token, wrappedRoomKey base64-encoded", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+    const { token, wrappedRoomKey } = await createInvite(app, owner.cookie, created.room.id);
 
     const response = await app.inject({
       method: "POST",
@@ -117,7 +191,9 @@ describe("POST /invites/lookup", () => {
       payload: { token },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json().roomId).toBe(created.room.id);
+    const body = json<InviteLookupResponse>(response);
+    expect(body.roomId).toBe(created.room.id);
+    expect(body.wrappedRoomKey).toBe(wrappedRoomKey.toString("base64"));
   });
 
   it("404s an unknown token", async () => {
@@ -166,7 +242,6 @@ describe("POST /invites/redeem", () => {
       payload: {
         token,
         displayNameCiphertext: randomBytes(16).toString("base64"),
-        deviceId: joinerDevice.id,
         expectedEpoch: 0,
         nameCiphertext: randomBytes(32).toString("base64"),
         envelopes: [
@@ -177,7 +252,7 @@ describe("POST /invites/redeem", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().newEpoch).toBe(1);
+    expect(json<RedeemResponse>(response).newEpoch).toBe(1);
 
     const lookupAfterRedeem = await app.inject({
       method: "POST",
@@ -199,7 +274,6 @@ describe("POST /invites/redeem", () => {
     const redeemPayload = {
       token,
       displayNameCiphertext: randomBytes(16).toString("base64"),
-      deviceId: joinerDevice.id,
       expectedEpoch: 0,
       nameCiphertext: randomBytes(32).toString("base64"),
       envelopes: [
@@ -216,12 +290,12 @@ describe("POST /invites/redeem", () => {
     });
 
     const second = await createSignedInUser();
-    const secondDevice = await registerDevice(app, second.cookie);
+    await registerDevice(app, second.cookie);
     const secondResponse = await app.inject({
       method: "POST",
       url: "/invites/redeem",
       headers: { cookie: second.cookie },
-      payload: { ...redeemPayload, deviceId: secondDevice.id },
+      payload: redeemPayload,
     });
 
     expect(secondResponse.statusCode).toBe(404);
@@ -244,7 +318,6 @@ describe("POST /invites/redeem", () => {
       payload: {
         token,
         displayNameCiphertext: randomBytes(16).toString("base64"),
-        deviceId: joinerDevice.id,
         expectedEpoch: 9,
         nameCiphertext: randomBytes(32).toString("base64"),
         envelopes: [

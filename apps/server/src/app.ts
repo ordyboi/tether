@@ -30,11 +30,15 @@ export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {})
   app.register(cors, { origin: env.TRUSTED_ORIGINS });
   app.decorateRequest("userId", "");
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {
       return reply.status(400).send({ error: "invalid request body", issues: error.issues });
     }
-    throw error;
+    // Never let a driver/framework error's message reach the client — it can carry SQL, column
+    // names or bound parameters (including caller identifiers). Route-level HttpErrors are
+    // already sent by sendHttpError before reaching here; anything landing here is unexpected.
+    request.log.error(error);
+    return reply.status(500).send({ error: "internal server error" });
   });
 
   app.register(authRoutes);

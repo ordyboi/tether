@@ -7,7 +7,7 @@ import { device } from "../db/schema/devices.js";
 import { membership } from "../db/schema/membership.js";
 import { roomKeyEnvelope } from "../db/schema/rooms.js";
 import { NotFoundError, sendHttpError } from "../rooms/errors.js";
-import { envelopeQuerySchema } from "./schemas.js";
+import { envelopeQuerySchema, toBase64 } from "./schemas.js";
 
 export function envelopeRoutes(app: FastifyInstance) {
   app.get("/envelopes", { preHandler: requireSession }, async (request, reply) => {
@@ -45,7 +45,12 @@ export function envelopeRoutes(app: FastifyInstance) {
         .innerJoin(membership, eq(membership.roomId, roomKeyEnvelope.roomId))
         .where(and(...conditions));
 
-      return { envelopes };
+      return {
+        envelopes: envelopes.map((envelope) => ({
+          ...envelope,
+          wrappedKey: toBase64(envelope.wrappedKey),
+        })),
+      };
     } catch (error) {
       return sendHttpError(reply, error);
     }

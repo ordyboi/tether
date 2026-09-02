@@ -2,13 +2,11 @@ import { and, eq, exists, gt, isNotNull, lt, notExists, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { FIX_RETENTION_HOURS } from "../constants.js";
-import type { db as clientDb } from "../db/client.js";
+import type { AppDatabase } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
 import { fix } from "../db/schema/fixes.js";
 import { invite } from "../db/schema/membership.js";
 import { room, roomKeyEnvelope } from "../db/schema/rooms.js";
-
-type AppDatabase = typeof clientDb;
 
 export async function runSweeper(db: AppDatabase, now = new Date()) {
   const fixCutoff = new Date(now.getTime() - FIX_RETENTION_HOURS * 60 * 60 * 1000);

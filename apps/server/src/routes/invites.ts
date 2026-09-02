@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { and, eq, gt, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -9,14 +8,19 @@ import { db } from "../db/client.js";
 import { invite, membership } from "../db/schema/membership.js";
 import { ConflictError, ForbiddenError, NotFoundError, sendHttpError } from "../rooms/errors.js";
 import { runRekey } from "../rooms/rekey.js";
-import { inviteCreateSchema, inviteLookupSchema, inviteRedeemSchema } from "./schemas.js";
+import {
+  inviteCreateSchema,
+  inviteLookupSchema,
+  inviteRedeemSchema,
+  roomIdParamSchema,
+  toBase64,
+} from "./schemas.js";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-// An unexpired, unredeemed, unrevoked invite row for tokenHash — the one condition every
-// lookup and redemption must pass, expressed once so they can never drift apart.
+// Every lookup and redemption must pass the same "unexpired, unredeemed, unrevoked" condition.
 function liveInviteWhere(tokenHash: string, now: Date) {
   return and(
     eq(invite.tokenHash, tokenHash),
@@ -26,12 +30,16 @@ function liveInviteWhere(tokenHash: string, now: Date) {
   );
 }
 
+function serializeInvite(row: typeof invite.$inferSelect) {
+  return { ...row, wrappedRoomKey: toBase64(row.wrappedRoomKey) };
+}
+
 export function inviteRoutes(app: FastifyInstance) {
   app.post("/rooms/:roomId/invites", { preHandler: requireSession }, async (request, reply) => {
-    const { roomId } = request.params as { roomId: string };
-    const body = inviteCreateSchema.parse(request.body);
-
     try {
+      const { roomId } = roomIdParamSchema.parse(request.params);
+      const body = inviteCreateSchema.parse(request.body);
+
       const [acting] = await db
         .select()
         .from(membership)
@@ -61,8 +69,11 @@ export function inviteRoutes(app: FastifyInstance) {
           expiresAt: body.expiresAt,
         })
         .returning();
+      if (!created) {
+        throw new Error("invite insert returned no row");
+      }
 
-      return reply.status(201).send(created);
+      return reply.status(201).send(serializeInvite(created));
     } catch (error) {
       return sendHttpError(reply, error);
     }
@@ -80,7 +91,7 @@ export function inviteRoutes(app: FastifyInstance) {
     return {
       roomId: row.roomId,
       grantsRole: row.grantsRole,
-      wrappedRoomKey: row.wrappedRoomKey,
+      wrappedRoomKey: toBase64(row.wrappedRoomKey),
       wrappedRoomKeyEpoch: row.wrappedRoomKeyEpoch,
       expiresAt: row.expiresAt,
     };
@@ -122,9 +133,7 @@ export function inviteRoutes(app: FastifyInstance) {
           envelopes: body.envelopes,
           async mutateMembership(innerTx, newEpoch) {
             if (existing) {
-              // rejoin after removal: keep the existing memberAlias, since fix.(roomId,
-              // authorAlias) is a foreign key onto membership.(roomId, memberAlias) and rotating
-              // it would orphan any surviving fix rows.
+              // Rejoin keeps memberAlias — rotating it would orphan fix rows via its FK onto it.
               await innerTx
                 .update(membership)
                 .set({

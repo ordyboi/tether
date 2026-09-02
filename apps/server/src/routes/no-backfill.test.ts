@@ -1,8 +1,4 @@
-// These two tests carry the entire no-backfill claim from docs/key-management-spec.md §3:
-// envelopes are only ever issued for epochs at or after a member's joinedEpoch, and because
-// each epoch's room key is an independent random value (no hash chain across epochs), a device
-// that was never issued an envelope for epoch N has no cryptographic path to that epoch's key —
-// not a server-side filtering rule, but a fact about what bytes exist for it to unwrap.
+// The no-backfill claim (docs/key-management-spec.md §3): a device gets no envelope for any epoch before its joinedEpoch.
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -13,7 +9,7 @@ import {
   unwrapRoomKey,
   wrapRoomKey,
 } from "@tether/crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -133,7 +129,6 @@ async function inviteAndRedeem(
     payload: {
       token: inviteToken,
       displayNameCiphertext: Buffer.from("member").toString("base64"),
-      deviceId: deviceRow.id,
       expectedEpoch: currentEpoch,
       nameCiphertext: Buffer.from("room-name").toString("base64"),
       envelopes,
@@ -178,9 +173,14 @@ describe("no-backfill: joining membership", () => {
     const envelopes = envelopesResponse.json().envelopes as { epoch: number }[];
     expect(envelopes.map((e) => e.epoch)).toEqual([3]);
 
-    // Cryptographic fact, not just a row count: the joiner's device secret cannot unwrap the
-    // epoch-1 envelope that belongs to round1's device — the two epochs' room keys are
-    // independent random values, so nothing derivable from epoch 3 reaches epoch 1.
+    // DB-level, bypassing the route: no envelope row exists for this device below its joinedEpoch.
+    const backfilledRows = await db
+      .select()
+      .from(roomKeyEnvelope)
+      .where(and(eq(roomKeyEnvelope.deviceId, round3.deviceRow.id), lt(roomKeyEnvelope.epoch, 3)));
+    expect(backfilledRows).toHaveLength(0);
+
+    // Distinct property: even a genuine envelope is bound to the device it was wrapped for.
     const [epoch1Envelope] = await db
       .select()
       .from(roomKeyEnvelope)
@@ -221,6 +221,15 @@ describe("no-backfill: removal", () => {
     const removedAlias = (roomsListing.json().rooms as { memberAlias: string }[])[0]?.memberAlias;
     if (!removedAlias) throw new Error("expected the joined member to have a room listing");
 
+    // Baseline: confirms the member genuinely received an envelope before removal.
+    const baselineResponse = await app.inject({
+      method: "GET",
+      url: `/envelopes?deviceId=${round1.deviceRow.id}`,
+      headers: { cookie: round1.joiner.cookie },
+    });
+    const baselineEnvelopes = baselineResponse.json().envelopes as { epoch: number }[];
+    expect(baselineEnvelopes.map((e) => e.epoch)).toEqual([1]);
+
     // Bump 1 -> 2: remove the member. Only the owner remains in the wrap set.
     const removalRoomKey = generateRoomKey(defaultRandomSource);
     const removalEnvelope = await wrapFor(
@@ -254,17 +263,14 @@ describe("no-backfill: removal", () => {
     ]);
     expect(round4.newEpoch).toBe(4);
 
-    const envelopesResponse = await app.inject({
-      method: "GET",
-      url: `/envelopes?deviceId=${round1.deviceRow.id}`,
-      headers: { cookie: round1.joiner.cookie },
-    });
-    const envelopes = envelopesResponse.json().envelopes as { epoch: number }[];
-    expect(envelopes.every((e) => e.epoch < 2)).toBe(true);
-    expect(envelopes.some((e) => e.epoch === 4)).toBe(false);
+    // Route hides all of this room's envelopes once removed, so assert DB-level instead: exactly the epoch-1 row survives, nothing at epoch 4.
+    const allEnvelopesForDevice = await db
+      .select()
+      .from(roomKeyEnvelope)
+      .where(eq(roomKeyEnvelope.deviceId, round1.deviceRow.id));
+    expect(allEnvelopesForDevice.map((row) => row.epoch)).toEqual([1]);
 
-    // Cryptographic fact: epoch 4's key is unreachable from the epoch-1 key the removed device
-    // still holds — independent per-epoch keys mean no derivation path exists.
+    // Distinct property: even the genuine epoch-4 envelope is unusable by the removed device's key.
     const [epoch4Envelope] = await db
       .select()
       .from(roomKeyEnvelope)

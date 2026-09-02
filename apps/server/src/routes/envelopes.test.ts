@@ -5,6 +5,20 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
 import { createSignedInUser } from "../auth/testing.js";
+import { json } from "../test-utils.js";
+
+interface DeviceResponse {
+  id: string;
+}
+
+interface RoomCreateResponse {
+  room: { id: string };
+  memberAlias: string;
+}
+
+interface EnvelopesResponse {
+  envelopes: { roomId: string; epoch: number; wrappedKey: string }[];
+}
 
 let app: FastifyInstance | null = null;
 
@@ -20,10 +34,11 @@ async function registerDevice(app: FastifyInstance, cookie: string) {
     headers: { cookie },
     payload: { identityPublicKey: randomBytes(32).toString("base64"), platform: "ios" },
   });
-  return response.json() as { id: string };
+  return json<DeviceResponse>(response);
 }
 
 async function createRoom(app: FastifyInstance, cookie: string, ownerDeviceId: string) {
+  const wrappedKey = randomBytes(48);
   const response = await app.inject({
     method: "POST",
     url: "/rooms",
@@ -32,14 +47,14 @@ async function createRoom(app: FastifyInstance, cookie: string, ownerDeviceId: s
       nameCiphertext: randomBytes(32).toString("base64"),
       precisionPolicy: "approximate_only",
       displayNameCiphertext: randomBytes(16).toString("base64"),
-      envelopes: [{ deviceId: ownerDeviceId, wrappedKey: randomBytes(48).toString("base64") }],
+      envelopes: [{ deviceId: ownerDeviceId, wrappedKey: wrappedKey.toString("base64") }],
     },
   });
-  return response.json() as { room: { id: string }; memberAlias: string };
+  return { ...json<RoomCreateResponse>(response), wrappedKey };
 }
 
 describe("GET /envelopes", () => {
-  it("serves the caller's own device its epoch-0 envelope", async () => {
+  it("serves the caller's own device its epoch-0 envelope, base64-encoded", async () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
@@ -52,10 +67,11 @@ describe("GET /envelopes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json();
+    const body = json<EnvelopesResponse>(response);
     expect(body.envelopes).toHaveLength(1);
-    expect(body.envelopes[0].roomId).toBe(created.room.id);
-    expect(body.envelopes[0].epoch).toBe(0);
+    expect(body.envelopes[0]?.roomId).toBe(created.room.id);
+    expect(body.envelopes[0]?.epoch).toBe(0);
+    expect(body.envelopes[0]?.wrappedKey).toBe(created.wrappedKey.toString("base64"));
   });
 
   it("404s a deviceId the caller does not own", async () => {
@@ -102,6 +118,6 @@ describe("GET /envelopes", () => {
     });
 
     expect(filtered.statusCode).toBe(200);
-    expect(filtered.json().envelopes).toHaveLength(0);
+    expect(json<EnvelopesResponse>(filtered).envelopes).toHaveLength(0);
   });
 });
