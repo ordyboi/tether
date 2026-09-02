@@ -14,7 +14,7 @@ export const epochReason = pgEnum("epoch_reason", [
   "guest_removed",
 ]);
 
-export const membershipRole = pgEnum("membership_role", ["owner", "member", "guest"]);
+export const membershipRole = pgEnum("membership_role", ["owner", "admin", "member", "guest"]);
 
 export const requestStatus = pgEnum("request_status", [
   "pending",

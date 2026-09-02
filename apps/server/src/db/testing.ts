@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { sql } from "drizzle-orm";
+import { getTableName, sql } from "drizzle-orm";
 
 import type { db as clientDb } from "./client.js";
 import { user } from "./schema/auth.js";
@@ -12,17 +12,18 @@ import { room, roomEpoch, roomKeyEnvelope } from "./schema/rooms.js";
 
 type AppDatabase = typeof clientDb;
 
+// order matters for TRUNCATE ... CASCADE below: children before the tables they reference
 const APP_TABLES = [
-  "precision_grant",
-  "precision_request",
-  "fix",
-  "invite",
-  "room_key_envelope",
-  "membership",
-  "room_epoch",
-  "room",
-  "device",
-];
+  precisionGrant,
+  precisionRequest,
+  fix,
+  invite,
+  roomKeyEnvelope,
+  membership,
+  roomEpoch,
+  room,
+  device,
+].map(getTableName);
 
 function assertRow<T>(row: T | undefined) {
   if (!row) {
@@ -101,7 +102,7 @@ export async function seedMembership(
     .insert(membership)
     .values({
       userId: overrides.userId ?? (await seedUser(db)).id,
-      memberAlias: overrides.memberAlias ?? randomUUID(),
+      memberAlias: randomUUID(),
       displayNameCiphertext: randomBytes(32),
       role: "member",
       joinedEpoch: 0,
@@ -195,6 +196,7 @@ export async function seedPrecisionGrant(
       epoch: 0,
       ratchetIndex: 0,
       ratchetGeneration: 0,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       ...overrides,
     })
     .returning();

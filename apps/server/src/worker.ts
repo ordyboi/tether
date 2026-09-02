@@ -1,4 +1,5 @@
 import { connection } from "./jobs/connection.js";
+import { sweeperQueue } from "./jobs/queue.js";
 import { registerSweeperSchedule } from "./jobs/scheduler.js";
 import { buildSweeperWorker } from "./jobs/worker.js";
 
@@ -8,6 +9,7 @@ async function main() {
 
   async function shutdown() {
     await worker.close();
+    await sweeperQueue.close();
     connection.disconnect();
     process.exit(0);
   }
@@ -16,4 +18,7 @@ async function main() {
   process.on("SIGINT", shutdown);
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});

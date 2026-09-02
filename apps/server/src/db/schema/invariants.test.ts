@@ -13,7 +13,7 @@ async function timestampColumns(tableName: string) {
   const result = await db.execute(sql`
     SELECT column_name, data_type
     FROM information_schema.columns
-    WHERE table_name = ${tableName}
+    WHERE table_schema = 'public' AND table_name = ${tableName}
   `);
 
   return result.rows
@@ -26,7 +26,7 @@ async function hasColumn(tableName: string, columnName: string) {
   const result = await db.execute(sql`
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = ${tableName} AND column_name = ${columnName}
+    WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${columnName}
   `);
 
   return result.rows.length > 0;
@@ -47,7 +47,7 @@ describe("no blanket timestamp mixin", () => {
     room: ["created_at", "updated_at"],
     room_epoch: ["created_at"],
     room_key_envelope: ["created_at"],
-    membership: ["removed_at"],
+    membership: ["joined_at", "removed_at"],
     invite: ["created_at", "expires_at", "redeemed_at", "revoked_at"],
     fix: ["server_received_at"],
     precision_request: ["created_at", "responded_at"],

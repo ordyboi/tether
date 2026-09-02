@@ -1,7 +1,6 @@
 import { Queue } from "bullmq";
 
 import { connection } from "./connection.js";
-
-export const SWEEPER_QUEUE = "sweeper";
+import { SWEEPER_QUEUE } from "./queue-name.js";
 
 export const sweeperQueue = new Queue(SWEEPER_QUEUE, { connection });

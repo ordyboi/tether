@@ -54,7 +54,7 @@ export const precisionGrant = snakeCase.table(
     ratchetIndex: integer().notNull(),
     ratchetGeneration: integer().notNull(),
     createdAt: timestamp().defaultNow().notNull(),
-    expiresAt: timestamp(),
+    expiresAt: timestamp().notNull(),
     revokedAt: timestamp(),
   },
   (table) => [

@@ -18,6 +18,7 @@ export const membership = snakeCase.table(
     displayNameCiphertext: bytea().notNull(),
     role: membershipRole().notNull(),
     joinedEpoch: integer().notNull(),
+    joinedAt: timestamp().defaultNow().notNull(),
     removedAt: timestamp(),
   },
   (table) => [

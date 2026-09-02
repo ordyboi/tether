@@ -13,7 +13,7 @@ describe("device schema", () => {
     const result = await db.execute(sql`
       SELECT data_type
       FROM information_schema.columns
-      WHERE table_name = 'device' AND column_name = 'last_seen_at'
+      WHERE table_schema = 'public' AND table_name = 'device' AND column_name = 'last_seen_at'
     `);
 
     expect(result.rows[0]?.data_type).toBe("date");
@@ -23,7 +23,7 @@ describe("device schema", () => {
     const result = await db.execute(sql`
       SELECT column_name
       FROM information_schema.columns
-      WHERE table_name = 'device' AND column_name = 'display_name'
+      WHERE table_schema = 'public' AND table_name = 'device' AND column_name = 'display_name'
     `);
 
     expect(result.rows).toHaveLength(0);

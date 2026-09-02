@@ -1,6 +1,8 @@
-import { sql } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 
 import type { db as clientDb } from "../db/client.js";
+import { fix } from "../db/schema/fixes.js";
+import { invite } from "../db/schema/membership.js";
 
 const FIX_RETENTION_HOURS = 24;
 
@@ -10,14 +12,14 @@ export async function runSweeper(db: AppDatabase, now = new Date()) {
   const fixCutoff = new Date(now.getTime() - FIX_RETENTION_HOURS * 60 * 60 * 1000);
 
   return db.transaction(async (tx) => {
-    const invites = await tx.execute(sql`
-      DELETE FROM invite WHERE expires_at < ${now}
-    `);
+    // going through the query builder (rather than binding a raw Date into sql``) is what keeps
+    // this UTC: node-postgres serialises a bound Date in the host's local offset, which Postgres
+    // then discards when parsing into a `timestamp without time zone` column.
+    const invites = await tx.delete(invite).where(lt(invite.expiresAt, now));
+    const fixes = await tx.delete(fix).where(lt(fix.serverReceivedAt, fixCutoff));
 
-    const fixes = await tx.execute(sql`
-      DELETE FROM fix WHERE server_received_at < ${fixCutoff}
-    `);
-
+    // a superseded envelope survives if a fix still needs its epoch, or if the epoch is the
+    // room's nameEpoch — either guard missing strands otherwise-readable data (PLAN.md §3).
     const envelopes = await tx.execute(sql`
       DELETE FROM room_key_envelope e
       WHERE EXISTS (SELECT 1 FROM device d
