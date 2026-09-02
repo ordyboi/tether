@@ -1,35 +1,41 @@
-import { sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "../client.js";
+import { informationSchemaColumns } from "../information-schema.js";
 
 const TIMESTAMP_TYPES = ["timestamp without time zone", "timestamp with time zone"];
 
-function isTimestampType(value: unknown) {
-  return typeof value === "string" && TIMESTAMP_TYPES.includes(value);
-}
-
 async function timestampColumns(tableName: string) {
-  const result = await db.execute(sql`
-    SELECT column_name, data_type
-    FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = ${tableName}
-  `);
+  const rows = await db
+    .select()
+    .from(informationSchemaColumns)
+    .where(
+      and(
+        eq(informationSchemaColumns.tableSchema, "public"),
+        eq(informationSchemaColumns.tableName, tableName),
+      ),
+    );
 
-  return result.rows
-    .filter((row) => isTimestampType(row.data_type))
-    .map((row) => String(row.column_name))
+  return rows
+    .filter((row) => row.dataType !== null && TIMESTAMP_TYPES.includes(row.dataType))
+    .map((row) => row.columnName)
     .sort();
 }
 
 async function hasColumn(tableName: string, columnName: string) {
-  const result = await db.execute(sql`
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = ${tableName} AND column_name = ${columnName}
-  `);
+  const rows = await db
+    .select()
+    .from(informationSchemaColumns)
+    .where(
+      and(
+        eq(informationSchemaColumns.tableSchema, "public"),
+        eq(informationSchemaColumns.tableName, tableName),
+        eq(informationSchemaColumns.columnName, columnName),
+      ),
+    );
 
-  return result.rows.length > 0;
+  return rows.length > 0;
 }
 
 describe("alias, not user id", () => {

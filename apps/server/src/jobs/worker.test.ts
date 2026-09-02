@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "../db/client.js";
 import { invite } from "../db/schema/membership.js";
-import { seedInvite, seedRoom, truncateAppTables } from "../db/testing.js";
-import { connection } from "./connection.js";
+import { seedInvite, seedRoom } from "../db/testing.js";
+import { redis } from "./redis.js";
 import { buildSweeperWorker } from "./worker.js";
 
 describe("sweeper worker", () => {
@@ -15,10 +15,9 @@ describe("sweeper worker", () => {
   let queue: Queue;
   let worker: ReturnType<typeof buildSweeperWorker>;
 
-  beforeEach(async () => {
-    await truncateAppTables(db);
-    queue = new Queue(queueName, { connection });
-    worker = buildSweeperWorker(connection, queueName);
+  beforeEach(() => {
+    queue = new Queue(queueName, { connection: redis });
+    worker = buildSweeperWorker(redis, queueName);
   });
 
   afterEach(async () => {

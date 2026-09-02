@@ -29,7 +29,7 @@ const envSchema = z.object({
   PASSKEY_RP_NAME: z.string().min(1),
   PASSKEY_ORIGIN: z.url(),
   REDIS_URL: z.url(),
-  SWEEPER_CRON: z.string().min(1).default("*/15 * * * *"),
+  SWEEPER_CRON: z.string().min(1),
 });
 
 export const env = envSchema.parse(process.env);

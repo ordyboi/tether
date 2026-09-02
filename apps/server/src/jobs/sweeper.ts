@@ -1,10 +1,12 @@
-import { lt, sql } from "drizzle-orm";
+import { and, eq, exists, gt, isNotNull, lt, notExists, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
+import { FIX_RETENTION_HOURS } from "../constants.js";
 import type { db as clientDb } from "../db/client.js";
+import { device } from "../db/schema/devices.js";
 import { fix } from "../db/schema/fixes.js";
 import { invite } from "../db/schema/membership.js";
-
-const FIX_RETENTION_HOURS = 24;
+import { room, roomKeyEnvelope } from "../db/schema/rooms.js";
 
 type AppDatabase = typeof clientDb;
 
@@ -12,29 +14,55 @@ export async function runSweeper(db: AppDatabase, now = new Date()) {
   const fixCutoff = new Date(now.getTime() - FIX_RETENTION_HOURS * 60 * 60 * 1000);
 
   return db.transaction(async (tx) => {
-    // going through the query builder (rather than binding a raw Date into sql``) is what keeps
-    // this UTC: node-postgres serialises a bound Date in the host's local offset, which Postgres
-    // then discards when parsing into a `timestamp without time zone` column.
+    // a bound Date here (rather than a query-builder comparison) would serialise in the host's
+    // local offset, which Postgres then discards parsing into a timestamp without time zone
     const invites = await tx.delete(invite).where(lt(invite.expiresAt, now));
     const fixes = await tx.delete(fix).where(lt(fix.serverReceivedAt, fixCutoff));
 
-    // a superseded envelope survives if a fix still needs its epoch, or if the epoch is the
-    // room's nameEpoch — either guard missing strands otherwise-readable data (PLAN.md §3).
-    const envelopes = await tx.execute(sql`
-      DELETE FROM room_key_envelope e
-      WHERE EXISTS (SELECT 1 FROM device d
-                     WHERE d.id = e.device_id AND d.revoked_at IS NOT NULL)
-         OR (
-              EXISTS (SELECT 1 FROM room_key_envelope n
-                       WHERE n.room_id = e.room_id
-                         AND n.device_id = e.device_id
-                         AND n.epoch > e.epoch)
-          AND NOT EXISTS (SELECT 1 FROM fix f
-                           WHERE f.room_id = e.room_id AND f.epoch = e.epoch)
-          AND NOT EXISTS (SELECT 1 FROM room r
-                           WHERE r.id = e.room_id AND r.name_epoch = e.epoch)
-        )
-    `);
+    const supersedingEnvelope = alias(roomKeyEnvelope, "superseding_envelope");
+
+    // a superseded envelope survives if a fix still needs its epoch, or the epoch is the room's
+    // nameEpoch — either guard missing strands otherwise-readable data (PLAN.md §3)
+    const envelopes = await tx.delete(roomKeyEnvelope).where(
+      or(
+        exists(
+          tx
+            .select()
+            .from(device)
+            .where(and(eq(device.id, roomKeyEnvelope.deviceId), isNotNull(device.revokedAt))),
+        ),
+        and(
+          exists(
+            tx
+              .select()
+              .from(supersedingEnvelope)
+              .where(
+                and(
+                  eq(supersedingEnvelope.roomId, roomKeyEnvelope.roomId),
+                  eq(supersedingEnvelope.deviceId, roomKeyEnvelope.deviceId),
+                  gt(supersedingEnvelope.epoch, roomKeyEnvelope.epoch),
+                ),
+              ),
+          ),
+          notExists(
+            tx
+              .select()
+              .from(fix)
+              .where(
+                and(eq(fix.roomId, roomKeyEnvelope.roomId), eq(fix.epoch, roomKeyEnvelope.epoch)),
+              ),
+          ),
+          notExists(
+            tx
+              .select()
+              .from(room)
+              .where(
+                and(eq(room.id, roomKeyEnvelope.roomId), eq(room.nameEpoch, roomKeyEnvelope.epoch)),
+              ),
+          ),
+        ),
+      ),
+    );
 
     return {
       invites: invites.rowCount ?? 0,

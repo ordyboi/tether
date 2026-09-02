@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
 
-import { connection } from "./connection.js";
-import { SWEEPER_QUEUE } from "./queue-name.js";
+import { SWEEPER_QUEUE } from "../constants.js";
+import { redis } from "./redis.js";
 
-export const sweeperQueue = new Queue(SWEEPER_QUEUE, { connection });
+export const sweeperQueue = new Queue(SWEEPER_QUEUE, { connection: redis });

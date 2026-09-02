@@ -1,8 +1,6 @@
+import { SWEEPER_JOB_ID, SWEEPER_JOB_NAME } from "../constants.js";
 import { env } from "../env.js";
 import { sweeperQueue } from "./queue.js";
-
-const SWEEPER_JOB_ID = "sweeper-repeat";
-const SWEEPER_JOB_NAME = "sweep";
 
 export async function registerSweeperSchedule() {
   await sweeperQueue.upsertJobScheduler(

@@ -1,15 +1,11 @@
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { db } from "../client.js";
-import { seedMembership, seedPrecisionRequest, seedRoom, truncateAppTables } from "../testing.js";
+import { seedMembership, seedPrecisionRequest, seedRoom } from "../testing.js";
 import { precisionRequest } from "./precision.js";
 
 describe("precision_request pending uniqueness", () => {
-  beforeEach(async () => {
-    await truncateAppTables(db);
-  });
-
   it("rejects a second pending request for the same pair", async () => {
     const room = await seedRoom(db);
     const from = await seedMembership(db, { roomId: room.id });

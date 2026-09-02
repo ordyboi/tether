@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { db } from "../db/client.js";
 import { fix } from "../db/schema/fixes.js";
@@ -15,7 +15,6 @@ import {
   seedMembership,
   seedPrecisionRequest,
   seedRoom,
-  truncateAppTables,
 } from "../db/testing.js";
 import { runSweeper } from "./sweeper.js";
 
@@ -74,10 +73,6 @@ function expectEnvelope(
 }
 
 describe("runSweeper", () => {
-  beforeEach(async () => {
-    await truncateAppTables(db);
-  });
-
   it("deletes exactly the rows past their retention boundary, and is idempotent", async () => {
     const assertions: Assertion[] = [];
 

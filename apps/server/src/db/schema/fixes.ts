@@ -12,12 +12,6 @@ import {
 import { membership } from "./membership.js";
 import { room } from "./rooms.js";
 
-function minuteRounded() {
-  const now = new Date();
-  now.setUTCSeconds(0, 0);
-  return now;
-}
-
 export const fix = snakeCase.table(
   "fix",
   {
@@ -31,7 +25,13 @@ export const fix = snakeCase.table(
     preciseCiphertext: bytea(),
     ratchetIndex: integer().notNull().default(0),
     ratchetGeneration: integer().notNull().default(0),
-    serverReceivedAt: timestamp().notNull().$defaultFn(minuteRounded),
+    serverReceivedAt: timestamp()
+      .notNull()
+      .$defaultFn(() => {
+        const now = new Date();
+        now.setUTCSeconds(0, 0);
+        return now;
+      }),
   },
   (table) => [
     foreignKey({

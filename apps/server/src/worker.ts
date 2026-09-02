@@ -1,16 +1,16 @@
-import { connection } from "./jobs/connection.js";
 import { sweeperQueue } from "./jobs/queue.js";
+import { redis } from "./jobs/redis.js";
 import { registerSweeperSchedule } from "./jobs/scheduler.js";
 import { buildSweeperWorker } from "./jobs/worker.js";
 
 async function main() {
   await registerSweeperSchedule();
-  const worker = buildSweeperWorker(connection);
+  const worker = buildSweeperWorker(redis);
 
   async function shutdown() {
     await worker.close();
     await sweeperQueue.close();
-    connection.disconnect();
+    redis.disconnect();
     process.exit(0);
   }
 

@@ -1,11 +1,8 @@
+import { sql } from "drizzle-orm";
 import { bytea, date, snakeCase, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "./auth.js";
 import { devicePlatform } from "./enums.js";
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export const device = snakeCase.table("device", {
   id: uuid().primaryKey().defaultRandom(),
@@ -16,6 +13,8 @@ export const device = snakeCase.table("device", {
   pushToken: text(),
   platform: devicePlatform().notNull(),
   createdAt: timestamp().defaultNow().notNull(),
-  lastSeenAt: date({ mode: "string" }).notNull().$defaultFn(today),
+  lastSeenAt: date({ mode: "string" })
+    .notNull()
+    .default(sql`CURRENT_DATE`),
   revokedAt: timestamp(),
 });

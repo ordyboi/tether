@@ -12,6 +12,7 @@ import {
 import { user } from "./auth.js";
 import { device } from "./devices.js";
 import { epochReason, precisionPolicy } from "./enums.js";
+import { timestamps } from "./timestamps.js";
 
 export const room = snakeCase.table("room", {
   id: uuid().primaryKey().defaultRandom(),
@@ -23,11 +24,7 @@ export const room = snakeCase.table("room", {
   precisionPolicy: precisionPolicy().notNull(),
   approximateRadiusM: integer().notNull().default(500),
   currentEpoch: integer().notNull().default(0),
-  createdAt: timestamp().defaultNow().notNull(),
-  updatedAt: timestamp()
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
+  ...timestamps(),
 });
 
 export const roomEpoch = snakeCase.table(

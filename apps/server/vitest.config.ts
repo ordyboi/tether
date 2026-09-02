@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     maxWorkers: 1,
     isolate: false,
+    setupFiles: ["./vitest.setup.ts"],
   },
 });
