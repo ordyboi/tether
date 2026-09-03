@@ -2,6 +2,7 @@
   "extends": ["expo/tsconfig.base", "../../tsconfig.base.json"],
   "compilerOptions": {
     "types": ["jest"],
+    "customConditions": ["react-native"],
     "paths": {
       "@/*": ["./src/*"],
       "@/assets/*": ["./assets/*"]
