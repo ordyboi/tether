@@ -34,20 +34,11 @@ function liveInviteWhere(tokenHash: string, now: Date) {
   );
 }
 
-// The membership_role column also allows "owner", but inviteCreateSchema never lets a caller
-// grant it — narrow here so the response type matches what invites can actually carry.
-function grantableRole(role: (typeof invite.$inferSelect)["grantsRole"]) {
-  if (role === "owner") {
-    throw new Error("invite grantsRole must never be owner");
-  }
-  return role;
-}
-
 function serializeInvite(row: typeof invite.$inferSelect) {
   return {
     id: row.id,
     roomId: row.roomId,
-    grantsRole: grantableRole(row.grantsRole),
+    grantsRole: row.grantsRole,
     wrappedRoomKey: toBase64(row.wrappedRoomKey),
     wrappedRoomKeyEpoch: row.wrappedRoomKeyEpoch,
     createdAt: row.createdAt.toISOString(),
@@ -125,7 +116,7 @@ export function inviteRoutes(app: FastifyInstance) {
 
       return {
         roomId: row.roomId,
-        grantsRole: grantableRole(row.grantsRole),
+        grantsRole: row.grantsRole,
         wrappedRoomKey: toBase64(row.wrappedRoomKey),
         wrappedRoomKeyEpoch: row.wrappedRoomKeyEpoch,
         expiresAt: row.expiresAt.toISOString(),
