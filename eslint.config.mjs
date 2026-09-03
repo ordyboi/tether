@@ -5,7 +5,14 @@ import prettierConfig from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.expo/**", "**/expo-env.d.ts"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.expo/**",
+      "**/expo-env.d.ts",
+      "**/.claude/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
