@@ -1,6 +1,7 @@
 import { fromNodeHeaders } from "better-auth/node";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyRequest } from "fastify";
 
+import { UnauthorizedError } from "../errors.js";
 import { auth } from "./auth.js";
 
 declare module "fastify" {
@@ -9,10 +10,22 @@ declare module "fastify" {
   }
 }
 
-export async function requireSession(request: FastifyRequest, reply: FastifyReply) {
+export async function requireSession(request: FastifyRequest) {
   const result = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
   if (!result) {
-    return reply.status(401).send({ error: "unauthorized" });
+    throw new UnauthorizedError("unauthorized");
   }
   request.userId = result.user.id;
+}
+
+export async function createSignedInUser() {
+  const { headers, response } = await auth.api.signInAnonymous({ returnHeaders: true });
+  const cookie = headers.get("set-cookie");
+  if (!cookie) {
+    throw new Error("sign-in-anonymous did not set a session cookie");
+  }
+  if (!response) {
+    throw new Error("sign-in-anonymous returned no response");
+  }
+  return { userId: response.user.id, cookie };
 }

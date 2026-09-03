@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
+import { ConflictError } from "../errors.js";
 import { deviceCreateSchema, toBase64 } from "./schemas.js";
 
 function serializeDevice(row: typeof device.$inferSelect) {
@@ -19,12 +20,10 @@ export function deviceRoutes(app: FastifyInstance) {
       .from(device)
       .where(eq(device.identityPublicKey, body.identityPublicKey));
 
+    if (existing?.userId && existing.userId !== request.userId) {
+      throw new ConflictError("identityPublicKey already registered to another user");
+    }
     if (existing) {
-      if (existing.userId !== request.userId) {
-        return reply
-          .status(409)
-          .send({ error: "identityPublicKey already registered to another user" });
-      }
       return reply.status(200).send(serializeDevice(existing));
     }
 

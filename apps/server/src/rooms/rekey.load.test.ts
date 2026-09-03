@@ -1,8 +1,6 @@
-// Household-scale and 10x-household-scale rekey churn, per issue #10: "the rekey churn number
-// (N devices per epoch bump) is recorded" — Phase 11 (#16) reads docs/rekey-churn.md to budget
-// guest-join UI latency against Phase 0b's ~53ms-per-device client wrap cost. This test asserts
-// correctness only (no wall-clock threshold — a slow CI runner must not turn this into a flake)
-// and prints the timings that get transcribed into that doc.
+// Records the rekey churn number (N devices per epoch bump) at household and 10x-household
+// scale, transcribed into docs/rekey-churn.md. Asserts correctness only — no wall-clock
+// threshold, so a slow CI runner can't turn this into a flake.
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -17,11 +15,10 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
-import { createSignedInUser } from "../auth/testing.js";
+import { createSignedInUser } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { roomKeyEnvelope } from "../db/schema/rooms.js";
 import { seedDevice, seedMembership, seedRoom, seedUser } from "../db/testing.js";
-import { json } from "../test-utils.js";
 
 interface DeviceResponse {
   id: string;
@@ -96,7 +93,7 @@ async function runChurnCase(householdDevices: number) {
       platform: "ios",
     },
   });
-  const joinerDeviceId = json<DeviceResponse>(joinerDeviceResponse).id;
+  const joinerDeviceId = joinerDeviceResponse.json<DeviceResponse>().id;
 
   const wrapTargets = [...existing, { deviceId: joinerDeviceId, identity: joinerIdentity }];
   const newEpoch = 1;
@@ -134,7 +131,7 @@ async function runChurnCase(householdDevices: number) {
   const serverMs = performance.now() - serverStart;
 
   expect(response.statusCode).toBe(200);
-  expect(json<RedeemResponse>(response).newEpoch).toBe(newEpoch);
+  expect(response.json<RedeemResponse>().newEpoch).toBe(newEpoch);
 
   const writtenEnvelopes = await db
     .select()

@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
-import { createSignedInUser } from "../auth/testing.js";
+import { createSignedInUser } from "../auth/session.js";
 
 let app: FastifyInstance | null = null;
 

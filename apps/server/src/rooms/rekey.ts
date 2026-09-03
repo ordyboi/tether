@@ -4,7 +4,7 @@ import type { AppDatabase } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
 import { invite, membership } from "../db/schema/membership.js";
 import { room, roomEpoch, roomKeyEnvelope } from "../db/schema/rooms.js";
-import { ConflictError, NotFoundError, StaleEpochError, WrapSetMismatchError } from "./errors.js";
+import { ConflictError, NotFoundError, StaleEpochError, WrapSetMismatchError } from "../errors.js";
 
 export type Tx = Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
 type EpochReason = (typeof roomEpoch.$inferInsert)["reason"];

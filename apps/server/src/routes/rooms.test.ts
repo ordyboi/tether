@@ -5,19 +5,10 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
-import { createSignedInUser } from "../auth/testing.js";
+import { createSignedInUser } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
-import { json } from "../test-utils.js";
-
-interface DeviceResponse {
-  id: string;
-}
-
-interface RoomCreateResponse {
-  room: { id: string; nameCiphertext: string };
-  memberAlias: string;
-}
+import { createRoom, registerDevice, type RoomCreateResponse } from "./test-helpers.js";
 
 let app: FastifyInstance | null = null;
 
@@ -25,36 +16,6 @@ afterEach(async () => {
   await app?.close();
   app = null;
 });
-
-async function registerDevice(app: FastifyInstance, cookie: string) {
-  const response = await app.inject({
-    method: "POST",
-    url: "/devices",
-    headers: { cookie },
-    payload: { identityPublicKey: randomBytes(32).toString("base64"), platform: "ios" },
-  });
-  return json<DeviceResponse>(response);
-}
-
-async function createRoom(
-  app: FastifyInstance,
-  cookie: string,
-  ownerDeviceId: string,
-  roomId?: string,
-) {
-  return app.inject({
-    method: "POST",
-    url: "/rooms",
-    headers: { cookie },
-    payload: {
-      roomId,
-      nameCiphertext: randomBytes(32).toString("base64"),
-      precisionPolicy: "approximate_only",
-      displayNameCiphertext: randomBytes(16).toString("base64"),
-      envelopes: [{ deviceId: ownerDeviceId, wrappedKey: randomBytes(48).toString("base64") }],
-    },
-  });
-}
 
 describe("POST /rooms", () => {
   it("creates a room with the caller as owner at epoch 0", async () => {
@@ -65,7 +26,7 @@ describe("POST /rooms", () => {
     const response = await createRoom(app, owner.cookie, ownerDevice.id);
 
     expect(response.statusCode).toBe(201);
-    const body = json<RoomCreateResponse>(response);
+    const body = response.json<RoomCreateResponse>();
     expect(typeof body.memberAlias).toBe("string");
   });
 
@@ -87,7 +48,7 @@ describe("POST /rooms", () => {
       },
     });
 
-    const body = json<RoomCreateResponse>(response);
+    const body = response.json<RoomCreateResponse>();
     expect(body.room.nameCiphertext).toBe(nameCiphertext.toString("base64"));
   });
 
@@ -120,10 +81,10 @@ describe("POST /rooms", () => {
     const ownerDevice = await registerDevice(app, owner.cookie);
     const roomId = crypto.randomUUID();
 
-    const first = await createRoom(app, owner.cookie, ownerDevice.id, roomId);
+    const first = await createRoom(app, owner.cookie, ownerDevice.id, { roomId });
     expect(first.statusCode).toBe(201);
 
-    const second = await createRoom(app, owner.cookie, ownerDevice.id, roomId);
+    const second = await createRoom(app, owner.cookie, ownerDevice.id, { roomId });
     expect(second.statusCode).toBe(409);
   });
 });
@@ -148,8 +109,8 @@ describe("GET /rooms", () => {
       headers: { cookie: other.cookie },
     });
 
-    expect(json<{ rooms: unknown[] }>(ownerList).rooms).toHaveLength(1);
-    expect(json<{ rooms: unknown[] }>(otherList).rooms).toHaveLength(0);
+    expect(ownerList.json<{ rooms: unknown[] }>().rooms).toHaveLength(1);
+    expect(otherList.json<{ rooms: unknown[] }>().rooms).toHaveLength(0);
   });
 });
 
@@ -159,7 +120,7 @@ describe("GET /rooms/:roomId/devices", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const roomId = json<RoomCreateResponse>(created).room.id;
+    const roomId = created.json<RoomCreateResponse>().room.id;
 
     const response = await app.inject({
       method: "GET",
@@ -168,10 +129,10 @@ describe("GET /rooms/:roomId/devices", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = json<{
+    const body = response.json<{
       epoch: number;
       devices: { deviceId: string; identityPublicKey: string }[];
-    }>(response);
+    }>();
     expect(body.epoch).toBe(0);
     expect(body.devices).toHaveLength(1);
     expect(body.devices[0]?.deviceId).toBe(ownerDevice.id);
@@ -182,7 +143,7 @@ describe("GET /rooms/:roomId/devices", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const roomId = json<RoomCreateResponse>(created).room.id;
+    const roomId = created.json<RoomCreateResponse>().room.id;
 
     const stranger = await createSignedInUser();
     const response = await app.inject({
@@ -215,7 +176,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room, memberAlias } = json<RoomCreateResponse>(created);
+    const { room, memberAlias } = created.json<RoomCreateResponse>();
 
     const response = await app.inject({
       method: "POST",
@@ -237,7 +198,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room } = json<RoomCreateResponse>(created);
+    const { room } = created.json<RoomCreateResponse>();
 
     const response = await app.inject({
       method: "POST",
@@ -280,7 +241,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room } = json<RoomCreateResponse>(created);
+    const { room } = created.json<RoomCreateResponse>();
 
     const stranger = await createSignedInUser();
     const response = await app.inject({
@@ -305,7 +266,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room } = json<RoomCreateResponse>(created);
+    const { room } = created.json<RoomCreateResponse>();
 
     const token = randomBytes(16).toString("hex");
     const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -339,7 +300,7 @@ describe("POST /rooms/:roomId/removals", () => {
         ],
       },
     });
-    const { memberAlias: joinedAlias } = json<{ memberAlias: string }>(redeemResponse);
+    const { memberAlias: joinedAlias } = redeemResponse.json<{ memberAlias: string }>();
 
     await app.inject({
       method: "POST",

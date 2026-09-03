@@ -1,5 +1,3 @@
-import type { FastifyReply } from "fastify";
-
 export class HttpError extends Error {
   readonly status: number;
   readonly details?: Record<string, unknown>;
@@ -8,6 +6,12 @@ export class HttpError extends Error {
     super(message);
     this.status = status;
     this.details = details;
+  }
+}
+
+export class UnauthorizedError extends HttpError {
+  constructor(message: string) {
+    super(401, message);
   }
 }
 
@@ -43,11 +47,4 @@ export class WrapSetMismatchError extends HttpError {
       duplicate,
     });
   }
-}
-
-export function sendHttpError(reply: FastifyReply, error: unknown) {
-  if (error instanceof HttpError) {
-    return reply.status(error.status).send({ error: error.message, ...error.details });
-  }
-  throw error;
 }

@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { invite, membership } from "../db/schema/membership.js";
-import { ConflictError, ForbiddenError, NotFoundError, sendHttpError } from "../rooms/errors.js";
+import { ConflictError, ForbiddenError, NotFoundError } from "../errors.js";
 import { runRekey } from "../rooms/rekey.js";
 import {
   inviteCreateSchema,
@@ -36,56 +36,52 @@ function serializeInvite(row: typeof invite.$inferSelect) {
 
 export function inviteRoutes(app: FastifyInstance) {
   app.post("/rooms/:roomId/invites", { preHandler: requireSession }, async (request, reply) => {
-    try {
-      const { roomId } = roomIdParamSchema.parse(request.params);
-      const body = inviteCreateSchema.parse(request.body);
+    const { roomId } = roomIdParamSchema.parse(request.params);
+    const body = inviteCreateSchema.parse(request.body);
 
-      const [acting] = await db
-        .select()
-        .from(membership)
-        .where(
-          and(
-            eq(membership.roomId, roomId),
-            eq(membership.userId, request.userId),
-            isNull(membership.removedAt),
-          ),
-        );
-      if (!acting || (acting.role !== "owner" && acting.role !== "admin")) {
-        throw new ForbiddenError("owner or admin role required to create an invite");
-      }
-      if (body.grantsRole === "admin" && acting.role !== "owner") {
-        throw new ForbiddenError("only the owner may grant the admin role");
-      }
-
-      const [created] = await db
-        .insert(invite)
-        .values({
-          roomId,
-          tokenHash: body.tokenHash,
-          grantsRole: body.grantsRole,
-          wrappedRoomKey: body.wrappedRoomKey,
-          wrappedRoomKeyEpoch: body.wrappedRoomKeyEpoch,
-          createdBy: request.userId,
-          expiresAt: body.expiresAt,
-        })
-        .returning();
-      if (!created) {
-        throw new Error("invite insert returned no row");
-      }
-
-      return reply.status(201).send(serializeInvite(created));
-    } catch (error) {
-      return sendHttpError(reply, error);
+    const [acting] = await db
+      .select()
+      .from(membership)
+      .where(
+        and(
+          eq(membership.roomId, roomId),
+          eq(membership.userId, request.userId),
+          isNull(membership.removedAt),
+        ),
+      );
+    if (!acting || (acting.role !== "owner" && acting.role !== "admin")) {
+      throw new ForbiddenError("owner or admin role required to create an invite");
     }
+    if (body.grantsRole === "admin" && acting.role !== "owner") {
+      throw new ForbiddenError("only the owner may grant the admin role");
+    }
+
+    const [created] = await db
+      .insert(invite)
+      .values({
+        roomId,
+        tokenHash: body.tokenHash,
+        grantsRole: body.grantsRole,
+        wrappedRoomKey: body.wrappedRoomKey,
+        wrappedRoomKeyEpoch: body.wrappedRoomKeyEpoch,
+        createdBy: request.userId,
+        expiresAt: body.expiresAt,
+      })
+      .returning();
+    if (!created) {
+      throw new Error("invite insert returned no row");
+    }
+
+    return reply.status(201).send(serializeInvite(created));
   });
 
-  app.post("/invites/lookup", async (request, reply) => {
+  app.post("/invites/lookup", async (request) => {
     const body = inviteLookupSchema.parse(request.body);
     const tokenHash = hashToken(body.token);
 
     const [row] = await db.select().from(invite).where(liveInviteWhere(tokenHash, new Date()));
     if (!row) {
-      return reply.status(404).send({ error: "invite not found" });
+      throw new NotFoundError("invite not found");
     }
 
     return {
@@ -101,69 +97,63 @@ export function inviteRoutes(app: FastifyInstance) {
     const body = inviteRedeemSchema.parse(request.body);
     const tokenHash = hashToken(body.token);
 
-    try {
-      const result = await db.transaction(async (tx) => {
-        const [inviteRow] = await tx
-          .select()
-          .from(invite)
-          .where(liveInviteWhere(tokenHash, new Date()))
-          .for("update");
-        if (!inviteRow) {
-          throw new NotFoundError("invite not found");
-        }
+    const result = await db.transaction(async (tx) => {
+      const [inviteRow] = await tx
+        .select()
+        .from(invite)
+        .where(liveInviteWhere(tokenHash, new Date()))
+        .for("update");
+      if (!inviteRow) {
+        throw new NotFoundError("invite not found");
+      }
 
-        const [existing] = await tx
-          .select()
-          .from(membership)
-          .where(
-            and(eq(membership.roomId, inviteRow.roomId), eq(membership.userId, request.userId)),
-          );
-        if (existing && !existing.removedAt) {
-          throw new ConflictError("already an active member of this room");
-        }
+      const [existing] = await tx
+        .select()
+        .from(membership)
+        .where(and(eq(membership.roomId, inviteRow.roomId), eq(membership.userId, request.userId)));
+      if (existing && !existing.removedAt) {
+        throw new ConflictError("already an active member of this room");
+      }
 
-        const memberAlias = existing?.memberAlias ?? randomUUID();
-        const reason = inviteRow.grantsRole === "guest" ? "guest_joined" : "member_joined";
+      const memberAlias = existing?.memberAlias ?? randomUUID();
+      const reason = inviteRow.grantsRole === "guest" ? "guest_joined" : "member_joined";
 
-        const rekeyResult = await runRekey(tx, {
-          roomId: inviteRow.roomId,
-          expectedEpoch: body.expectedEpoch,
-          reason,
-          nameCiphertext: body.nameCiphertext,
-          envelopes: body.envelopes,
-          async mutateMembership(innerTx, newEpoch) {
-            if (existing) {
-              // Rejoin keeps memberAlias — rotating it would orphan fix rows via its FK onto it.
-              await innerTx
-                .update(membership)
-                .set({
-                  role: inviteRow.grantsRole,
-                  joinedEpoch: newEpoch,
-                  removedAt: null,
-                  displayNameCiphertext: body.displayNameCiphertext,
-                })
-                .where(eq(membership.id, existing.id));
-            } else {
-              await innerTx.insert(membership).values({
-                roomId: inviteRow.roomId,
-                userId: request.userId,
-                memberAlias,
-                displayNameCiphertext: body.displayNameCiphertext,
+      const rekeyResult = await runRekey(tx, {
+        roomId: inviteRow.roomId,
+        expectedEpoch: body.expectedEpoch,
+        reason,
+        nameCiphertext: body.nameCiphertext,
+        envelopes: body.envelopes,
+        async mutateMembership(innerTx, newEpoch) {
+          if (existing) {
+            // Rejoin keeps memberAlias — rotating it would orphan fix rows via its FK onto it.
+            await innerTx
+              .update(membership)
+              .set({
                 role: inviteRow.grantsRole,
                 joinedEpoch: newEpoch,
-              });
-            }
-          },
-        });
-
-        await tx.update(invite).set({ redeemedAt: new Date() }).where(eq(invite.id, inviteRow.id));
-
-        return { ...rekeyResult, roomId: inviteRow.roomId, memberAlias };
+                removedAt: null,
+                displayNameCiphertext: body.displayNameCiphertext,
+              })
+              .where(eq(membership.id, existing.id));
+          } else {
+            await innerTx.insert(membership).values({
+              roomId: inviteRow.roomId,
+              userId: request.userId,
+              memberAlias,
+              displayNameCiphertext: body.displayNameCiphertext,
+              role: inviteRow.grantsRole,
+              joinedEpoch: newEpoch,
+            });
+          }
+        },
       });
 
-      return reply.status(200).send(result);
-    } catch (error) {
-      return sendHttpError(reply, error);
-    }
+      await tx.update(invite).set({ redeemedAt: new Date() }).where(eq(invite.id, inviteRow.id));
+
+      return { ...rekeyResult, roomId: inviteRow.roomId, memberAlias };
+    });
+
+    return reply.status(200).send(result);
   });
 }

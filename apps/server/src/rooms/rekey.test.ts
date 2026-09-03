@@ -7,7 +7,7 @@ import { db } from "../db/client.js";
 import { invite, membership } from "../db/schema/membership.js";
 import { roomKeyEnvelope } from "../db/schema/rooms.js";
 import { seedDevice, seedEpoch, seedMembership, seedRoom, seedUser } from "../db/testing.js";
-import { StaleEpochError, WrapSetMismatchError } from "./errors.js";
+import { StaleEpochError, WrapSetMismatchError } from "../errors.js";
 import { type ApplyRekeyParams, createRoom, runRekey } from "./rekey.js";
 
 function applyRekey(params: ApplyRekeyParams) {

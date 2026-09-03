@@ -4,17 +4,8 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
-import { createSignedInUser } from "../auth/testing.js";
-import { json } from "../test-utils.js";
-
-interface DeviceResponse {
-  id: string;
-}
-
-interface RoomCreateResponse {
-  room: { id: string };
-  memberAlias: string;
-}
+import { createSignedInUser } from "../auth/session.js";
+import { createRoom, registerDevice, type RoomCreateResponse } from "./test-helpers.js";
 
 interface EnvelopesResponse {
   envelopes: { roomId: string; epoch: number; wrappedKey: string }[];
@@ -27,38 +18,15 @@ afterEach(async () => {
   app = null;
 });
 
-async function registerDevice(app: FastifyInstance, cookie: string) {
-  const response = await app.inject({
-    method: "POST",
-    url: "/devices",
-    headers: { cookie },
-    payload: { identityPublicKey: randomBytes(32).toString("base64"), platform: "ios" },
-  });
-  return json<DeviceResponse>(response);
-}
-
-async function createRoom(app: FastifyInstance, cookie: string, ownerDeviceId: string) {
-  const wrappedKey = randomBytes(48);
-  const response = await app.inject({
-    method: "POST",
-    url: "/rooms",
-    headers: { cookie },
-    payload: {
-      nameCiphertext: randomBytes(32).toString("base64"),
-      precisionPolicy: "approximate_only",
-      displayNameCiphertext: randomBytes(16).toString("base64"),
-      envelopes: [{ deviceId: ownerDeviceId, wrappedKey: wrappedKey.toString("base64") }],
-    },
-  });
-  return { ...json<RoomCreateResponse>(response), wrappedKey };
-}
-
 describe("GET /envelopes", () => {
   it("serves the caller's own device its epoch-0 envelope, base64-encoded", async () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
-    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+    const wrappedKey = randomBytes(48);
+    const created = (
+      await createRoom(app, owner.cookie, ownerDevice.id, { wrappedKey })
+    ).json<RoomCreateResponse>();
 
     const response = await app.inject({
       method: "GET",
@@ -67,11 +35,11 @@ describe("GET /envelopes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = json<EnvelopesResponse>(response);
+    const body = response.json<EnvelopesResponse>();
     expect(body.envelopes).toHaveLength(1);
     expect(body.envelopes[0]?.roomId).toBe(created.room.id);
     expect(body.envelopes[0]?.epoch).toBe(0);
-    expect(body.envelopes[0]?.wrappedKey).toBe(created.wrappedKey.toString("base64"));
+    expect(body.envelopes[0]?.wrappedKey).toBe(wrappedKey.toString("base64"));
   });
 
   it("404s a deviceId the caller does not own", async () => {
@@ -109,7 +77,9 @@ describe("GET /envelopes", () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
-    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+    const created = (
+      await createRoom(app, owner.cookie, ownerDevice.id)
+    ).json<RoomCreateResponse>();
 
     const filtered = await app.inject({
       method: "GET",
@@ -118,6 +88,6 @@ describe("GET /envelopes", () => {
     });
 
     expect(filtered.statusCode).toBe(200);
-    expect(json<EnvelopesResponse>(filtered).envelopes).toHaveLength(0);
+    expect(filtered.json<EnvelopesResponse>().envelopes).toHaveLength(0);
   });
 });
