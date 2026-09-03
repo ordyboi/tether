@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
 import { createSignedInUser } from "../auth/session.js";
-import { createRoom, registerDevice, type RoomCreateResponse } from "../test-helpers.js";
+import type { RoomSummary } from "@tether/api";
+import { createRoom, registerDevice } from "../test-helpers.js";
 
 interface EnvelopesResponse {
   envelopes: { roomId: string; epoch: number; wrappedKey: string }[];
@@ -26,7 +27,7 @@ describe("GET /envelopes", () => {
     const wrappedKey = randomBytes(48);
     const created = (
       await createRoom(app, owner.cookie, ownerDevice.id, { wrappedKey })
-    ).json<RoomCreateResponse>();
+    ).json<RoomSummary>();
 
     const response = await app.inject({
       method: "GET",
@@ -77,9 +78,7 @@ describe("GET /envelopes", () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
-    const created = (
-      await createRoom(app, owner.cookie, ownerDevice.id)
-    ).json<RoomCreateResponse>();
+    const created = (await createRoom(app, owner.cookie, ownerDevice.id)).json<RoomSummary>();
 
     const filtered = await app.inject({
       method: "GET",

@@ -137,7 +137,7 @@ export interface CreateRoomParams {
   readonly envelopes: EnvelopeInput[];
 }
 
-const CREATION_EPOCH = 0;
+export const CREATION_EPOCH = 0;
 
 // No room row exists yet to lock, so this skips runRekey's lock-and-compare step.
 export async function createRoom(db: AppDatabase, params: CreateRoomParams) {

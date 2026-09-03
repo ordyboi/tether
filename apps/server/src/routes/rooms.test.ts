@@ -8,7 +8,8 @@ import { buildApp } from "../app.js";
 import { createSignedInUser } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
-import { createRoom, registerDevice, type RoomCreateResponse } from "../test-helpers.js";
+import type { RoomSummary } from "@tether/api";
+import { createRoom, registerDevice } from "../test-helpers.js";
 
 let app: FastifyInstance | null = null;
 
@@ -26,7 +27,7 @@ describe("POST /rooms", () => {
     const response = await createRoom(app, owner.cookie, ownerDevice.id);
 
     expect(response.statusCode).toBe(201);
-    const body = response.json<RoomCreateResponse>();
+    const body = response.json<RoomSummary>();
     expect(typeof body.memberAlias).toBe("string");
     expect(body.role).toBe("owner");
     expect(body.joinedEpoch).toBe(0);
@@ -54,7 +55,7 @@ describe("POST /rooms", () => {
       },
     });
 
-    const body = response.json<RoomCreateResponse>();
+    const body = response.json<RoomSummary>();
     expect(body.nameCiphertext).toBe(nameCiphertext.toString("base64"));
   });
 
@@ -115,12 +116,12 @@ describe("GET /rooms", () => {
       headers: { cookie: other.cookie },
     });
 
-    const rooms = ownerList.json<{ rooms: RoomCreateResponse[] }>().rooms;
+    const rooms = ownerList.json<{ rooms: RoomSummary[] }>().rooms;
     expect(rooms).toHaveLength(1);
     expect(otherList.json<{ rooms: unknown[] }>().rooms).toHaveLength(0);
 
     const [listedRoom] = rooms;
-    const createdRoom = created.json<RoomCreateResponse>();
+    const createdRoom = created.json<RoomSummary>();
     expect(listedRoom).not.toHaveProperty("ownerId");
     expect(Object.keys(listedRoom ?? {}).sort()).toEqual(Object.keys(createdRoom).sort());
   });
@@ -132,7 +133,7 @@ describe("GET /rooms/:roomId/devices", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const roomId = created.json<RoomCreateResponse>().roomId;
+    const roomId = created.json<RoomSummary>().roomId;
 
     const response = await app.inject({
       method: "GET",
@@ -155,7 +156,7 @@ describe("GET /rooms/:roomId/devices", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const roomId = created.json<RoomCreateResponse>().roomId;
+    const roomId = created.json<RoomSummary>().roomId;
 
     const stranger = await createSignedInUser();
     const response = await app.inject({
@@ -188,7 +189,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { roomId, memberAlias } = created.json<RoomCreateResponse>();
+    const { roomId, memberAlias } = created.json<RoomSummary>();
 
     const response = await app.inject({
       method: "POST",
@@ -210,7 +211,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { roomId } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomSummary>();
 
     const response = await app.inject({
       method: "POST",
@@ -253,7 +254,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { roomId } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomSummary>();
 
     const stranger = await createSignedInUser();
     const response = await app.inject({
@@ -278,7 +279,7 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { roomId } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomSummary>();
 
     const token = randomBytes(16).toString("hex");
     const tokenHash = createHash("sha256").update(token).digest("hex");

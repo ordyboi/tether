@@ -17,7 +17,7 @@ import { db } from "../db/client.js";
 import { membership } from "../db/schema/membership.js";
 import { room } from "../db/schema/rooms.js";
 import { ForbiddenError, NotFoundError } from "../errors.js";
-import { createRoom, listActiveDevices, runRekey } from "../rooms/rekey.js";
+import { CREATION_EPOCH, createRoom, listActiveDevices, runRekey } from "../rooms/rekey.js";
 import type { ZodTypeProvider } from "../zod-type-provider.js";
 import { fromBase64, toBase64 } from "./bytes.js";
 
@@ -98,7 +98,7 @@ export function roomRoutes(app: FastifyInstance) {
         approximateRadiusM: created.approximateRadiusM,
         memberAlias,
         role: "owner",
-        joinedEpoch: 0,
+        joinedEpoch: CREATION_EPOCH,
       });
     },
   );
