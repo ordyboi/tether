@@ -17,6 +17,7 @@ function zodFieldErrors(error: ZodError) {
   return error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message }));
 }
 
+// FastifySchema["response"] is typed unknown, so spreading it needs a guard first.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -43,10 +44,7 @@ export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {})
   app.setValidatorCompiler(zodValidatorCompiler);
   app.setSerializerCompiler(zodSerializerCompiler);
 
-  // Every declared success schema needs a matching 4xx/5xx schema or fastify silently falls back
-  // to raw JSON.stringify on error, which is how an undeclared field would sneak onto the wire.
-  // The auth plugin proxies better-auth's own response as a string via reply.send(), which the
-  // zod serializer cannot parse, so it's excluded.
+  // Fastify falls back to raw JSON.stringify with no 4xx/5xx schema; /api/auth/* sends a plain string.
   app.addHook("onRoute", (routeOptions) => {
     if (routeOptions.url.startsWith("/api/auth")) return;
     const response = isRecord(routeOptions.schema?.response)
@@ -74,6 +72,10 @@ export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {})
     // names or bound parameters (including caller identifiers).
     request.log.error(error);
     return reply.status(500).send({ code: "internal", message: "internal server error" });
+  });
+
+  app.setNotFoundHandler((_request, reply) => {
+    return reply.status(404).send({ code: "not_found", message: "not found" });
   });
 
   app.register(authRoutes);

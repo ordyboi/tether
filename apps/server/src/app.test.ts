@@ -1,11 +1,14 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Writable } from "node:stream";
 
+import type { RoomSummary } from "@tether/api";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { buildApp } from "./app.js";
 import { createSignedInUser } from "./auth/session.js";
-import { createRoom, registerDevice, type RoomCreateResponse } from "./test-helpers.js";
+import { createRoom, registerDevice } from "./test-helpers.js";
+import type { ZodTypeProvider } from "./zod-type-provider.js";
 
 function captureLogger() {
   const chunks: string[] = [];
@@ -48,7 +51,7 @@ describe("error handler", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { roomId } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomSummary>();
 
     const token = randomUUID();
     const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -108,20 +111,53 @@ describe("error handler", () => {
     const body = response.json();
     expect(body).toEqual({ code: "internal", message: "internal server error" });
   });
+
+  it("500s a handler that returns the wrong shape, without naming response fields", async () => {
+    const app = buildApp();
+    const server = app.withTypeProvider<ZodTypeProvider>();
+    server.get(
+      "/__wrong-shape",
+      { schema: { response: { 200: z.object({ n: z.number() }) } } },
+      // @ts-expect-error deliberately wrong to exercise the serializer's failure path
+      () => ({ n: "not-a-number" }),
+    );
+
+    const response = await app.inject({ method: "GET", url: "/__wrong-shape" });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ code: "internal", message: "internal server error" });
+    expect(response.body).not.toContain("expected number");
+    expect(response.body).not.toContain('"n"');
+  });
+});
+
+describe("not found handler", () => {
+  it("gives an unknown route a { code: not_found } body, not fastify's default", async () => {
+    const app = buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/definitely-not-a-route" });
+    await app.close();
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ code: "not_found", message: "not found" });
+  });
 });
 
 describe("the onRoute error-schema hook", () => {
-  it("still round-trips a non-2xx response from /api/auth/*", async () => {
+  it("still round-trips a real JSON body from /api/auth/*", async () => {
     const app = buildApp();
 
     const response = await app.inject({
-      method: "GET",
-      url: "/api/auth/does-not-exist",
+      method: "POST",
+      url: "/api/auth/sign-in/anonymous",
     });
 
     await app.close();
 
-    expect(response.statusCode).not.toBe(500);
-    expect(() => response.json()).not.toThrow();
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(typeof body.token).toBe("string");
+    expect(typeof body.user.id).toBe("string");
   });
 });
