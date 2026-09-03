@@ -3,6 +3,7 @@
 // threshold, so a slow CI runner can't turn this into a flake.
 import { createHash, randomUUID } from "node:crypto";
 
+import type { DeviceResponse, RedeemResponse } from "@tether/api";
 import {
   aesGcm,
   defaultRandomSource,
@@ -19,14 +20,6 @@ import { createSignedInUser } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { roomKeyEnvelope } from "../db/schema/rooms.js";
 import { seedDevice, seedMembership, seedRoom, seedUser } from "../db/testing.js";
-
-interface DeviceResponse {
-  id: string;
-}
-
-interface RedeemResponse {
-  newEpoch: number;
-}
 
 let app: FastifyInstance | null = null;
 
