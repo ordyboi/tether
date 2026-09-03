@@ -3,8 +3,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-// Anchored on cwd (the package root vitest runs from), not import.meta.url — this file also
-// runs from dist/purity.test.js after a build, where sibling .ts sources don't exist.
+// Anchored on cwd (the package root vitest runs from), not import.meta.url.
 const srcDir = join(process.cwd(), "src");
 
 function sourceFiles() {
