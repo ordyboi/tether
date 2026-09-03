@@ -10,6 +10,7 @@ import { envelopeRoutes } from "./routes/envelopes.js";
 import { healthRoutes } from "./routes/health.js";
 import { inviteRoutes } from "./routes/invites.js";
 import { roomRoutes } from "./routes/rooms.js";
+import { zodSerializerCompiler, zodValidatorCompiler } from "./zod-type-provider.js";
 
 export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {}) {
   const app = Fastify({
@@ -30,6 +31,8 @@ export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {})
 
   app.register(cors, { origin: env.TRUSTED_ORIGINS });
   app.decorateRequest("userId", "");
+  app.setValidatorCompiler(zodValidatorCompiler);
+  app.setSerializerCompiler(zodSerializerCompiler);
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {
