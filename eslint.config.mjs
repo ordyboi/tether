@@ -19,5 +19,18 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
     },
   },
+  {
+    files: ["packages/api/src/client/**/*.ts", "packages/api/src/types.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ name: "zod", allowTypeImports: true }],
+          patterns: [{ group: ["**/schemas.js"], allowTypeImports: true }],
+        },
+      ],
+    },
+  },
   prettierConfig,
 );
