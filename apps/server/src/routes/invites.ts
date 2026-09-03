@@ -15,7 +15,7 @@ import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { invite, membership } from "../db/schema/membership.js";
-import { ConflictError, ForbiddenError, NotFoundError } from "../errors.js";
+import { AlreadyMemberError, ForbiddenError, NotFoundError } from "../errors.js";
 import { runRekey } from "../rooms/rekey.js";
 import type { ZodTypeProvider } from "../zod-type-provider.js";
 import { fromBase64, toBase64 } from "./bytes.js";
@@ -160,7 +160,7 @@ export function inviteRoutes(app: FastifyInstance) {
             and(eq(membership.roomId, inviteRow.roomId), eq(membership.userId, request.userId)),
           );
         if (existing && !existing.removedAt) {
-          throw new ConflictError("already an active member of this room");
+          throw new AlreadyMemberError();
         }
 
         const memberAlias = existing?.memberAlias ?? randomUUID();

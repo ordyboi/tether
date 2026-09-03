@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
-import { ConflictError } from "../errors.js";
+import { DeviceAlreadyRegisteredError } from "../errors.js";
 import type { ZodTypeProvider } from "../zod-type-provider.js";
 import { fromBase64, toBase64 } from "./bytes.js";
 
@@ -42,7 +42,7 @@ export function deviceRoutes(app: FastifyInstance) {
         .where(eq(device.identityPublicKey, identityPublicKey));
 
       if (existing?.userId && existing.userId !== request.userId) {
-        throw new ConflictError("identityPublicKey already registered to another user");
+        throw new DeviceAlreadyRegisteredError();
       }
       if (existing) {
         return reply.status(200).send(serializeDevice(existing));
