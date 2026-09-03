@@ -11,6 +11,13 @@ function fakeFetch(response: { status: number; body: unknown }) {
   });
 }
 
+function fakeRawFetch(response: { status: number; body: string }) {
+  return vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(response.body === "" ? null : response.body, { status: response.status }),
+  );
+}
+
 describe("createTetherClient", () => {
   it("joins baseUrl and path, sends JSON, and merges async headers", async () => {
     const fetch = fakeFetch({ status: 200, body: { rooms: [] } });
@@ -53,5 +60,35 @@ describe("createTetherClient", () => {
       expect(error.body).toEqual({ error: "not found" });
       return true;
     });
+  });
+
+  it("throws TetherApiError with the status on an empty non-JSON error body", async () => {
+    const fetch = fakeRawFetch({ status: 401, body: "" });
+    const client = createTetherClient({ baseUrl: "https://api.example.com", fetch });
+
+    await expect(client.listRooms()).rejects.toSatisfy((error: unknown) => {
+      if (!(error instanceof TetherApiError)) return false;
+      expect(error.status).toBe(401);
+      return true;
+    });
+  });
+
+  it("throws TetherApiError with the status on an HTML gateway error body", async () => {
+    const fetch = fakeRawFetch({ status: 502, body: "<html>502</html>" });
+    const client = createTetherClient({ baseUrl: "https://api.example.com", fetch });
+
+    await expect(client.listRooms()).rejects.toSatisfy((error: unknown) => {
+      if (!(error instanceof TetherApiError)) return false;
+      expect(error.status).toBe(502);
+      expect(error.body).toBe("<html>502</html>");
+      return true;
+    });
+  });
+
+  it("resolves rather than throwing on a 204 with an empty body", async () => {
+    const fetch = fakeRawFetch({ status: 204, body: "" });
+    const client = createTetherClient({ baseUrl: "https://api.example.com", fetch });
+
+    await expect(client.listRooms()).resolves.toBeUndefined();
   });
 });

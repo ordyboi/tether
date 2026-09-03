@@ -47,4 +47,21 @@ describe("createTetherClient (mobile)", () => {
 
     await expect(client.listRooms()).rejects.toBeInstanceOf(TetherApiError);
   });
+
+  it("throws TetherApiError with the status on a non-JSON error body", async () => {
+    const fetch = jest.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response("<html>502</html>", { status: 502 }),
+    );
+    const client = createTetherClient({ baseUrl: "https://api.example.com", fetch });
+
+    let caught: unknown;
+    try {
+      await client.listRooms();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(TetherApiError);
+    expect((caught as TetherApiError).status).toBe(502);
+  });
 });
