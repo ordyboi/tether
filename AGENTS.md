@@ -35,4 +35,4 @@ Always work with `db:push` in a local docker compose for `postgres`, never creat
 
 ## PR rules
 
-When asked to submit a PR, keep the PR title as `Issue #X: {}` in the `{}` placeholder replace with a concise explanation of what you implemented in plain-english not what you done, keep that as a short description
+When asked to submit a PR, submit as a draft, keep the PR title as `Issue #X: {}` in the `{}` placeholder replace with a concise explanation of what you implemented in plain-english not what you done, keep that as a short description
