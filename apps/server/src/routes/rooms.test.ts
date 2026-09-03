@@ -8,7 +8,7 @@ import { buildApp } from "../app.js";
 import { createSignedInUser } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
-import { createRoom, registerDevice, type RoomCreateResponse } from "./test-helpers.js";
+import { createRoom, registerDevice, type RoomCreateResponse } from "../test-helpers.js";
 
 let app: FastifyInstance | null = null;
 

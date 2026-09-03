@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
 import { createSignedInUser } from "../auth/session.js";
-import { createRoom, registerDevice, type RoomCreateResponse } from "./test-helpers.js";
+import { createRoom, registerDevice, type RoomCreateResponse } from "../test-helpers.js";
 
 interface EnvelopesResponse {
   envelopes: { roomId: string; epoch: number; wrappedKey: string }[];
