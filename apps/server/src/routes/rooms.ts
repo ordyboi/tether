@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
 
-import { removalSchema, roomCreateSchema, roomIdParamSchema } from "@tether/api";
+import {
+  rekeyResultSchema,
+  removalSchema,
+  roomCreateSchema,
+  roomDevicesResponseSchema,
+  roomIdParamSchema,
+  roomListResponseSchema,
+  roomSummarySchema,
+} from "@tether/api";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -29,36 +37,41 @@ async function requireActiveMembership(roomId: string, userId: string) {
   }
 }
 
-function serializeRoom(row: typeof room.$inferSelect) {
-  return { ...row, nameCiphertext: toBase64(row.nameCiphertext) };
-}
-
 export function roomRoutes(app: FastifyInstance) {
   const server = app.withTypeProvider<ZodTypeProvider>();
 
-  server.get("/rooms", { onRequest: requireSession }, async (request) => {
-    const rows = await db
-      .select({
-        roomId: room.id,
-        currentEpoch: room.currentEpoch,
-        nameCiphertext: room.nameCiphertext,
-        nameEpoch: room.nameEpoch,
-        precisionPolicy: room.precisionPolicy,
-        approximateRadiusM: room.approximateRadiusM,
-        memberAlias: membership.memberAlias,
-        role: membership.role,
-        joinedEpoch: membership.joinedEpoch,
-      })
-      .from(membership)
-      .innerJoin(room, eq(room.id, membership.roomId))
-      .where(and(eq(membership.userId, request.userId), isNull(membership.removedAt)));
+  server.get(
+    "/rooms",
+    { onRequest: requireSession, schema: { response: { 200: roomListResponseSchema } } },
+    async (request) => {
+      const rows = await db
+        .select({
+          roomId: room.id,
+          currentEpoch: room.currentEpoch,
+          nameCiphertext: room.nameCiphertext,
+          nameEpoch: room.nameEpoch,
+          precisionPolicy: room.precisionPolicy,
+          approximateRadiusM: room.approximateRadiusM,
+          memberAlias: membership.memberAlias,
+          role: membership.role,
+          joinedEpoch: membership.joinedEpoch,
+        })
+        .from(membership)
+        .innerJoin(room, eq(room.id, membership.roomId))
+        .where(and(eq(membership.userId, request.userId), isNull(membership.removedAt)));
 
-    return { rooms: rows.map((row) => ({ ...row, nameCiphertext: toBase64(row.nameCiphertext) })) };
-  });
+      return {
+        rooms: rows.map((row) => ({ ...row, nameCiphertext: toBase64(row.nameCiphertext) })),
+      };
+    },
+  );
 
   server.post(
     "/rooms",
-    { onRequest: requireSession, schema: { body: roomCreateSchema } },
+    {
+      onRequest: requireSession,
+      schema: { body: roomCreateSchema, response: { 201: roomSummarySchema } },
+    },
     async (request, reply) => {
       const body = request.body;
       const memberAlias = randomUUID();
@@ -76,13 +89,26 @@ export function roomRoutes(app: FastifyInstance) {
           wrappedKey: fromBase64(envelope.wrappedKey),
         })),
       });
-      return reply.status(201).send({ room: serializeRoom(created), memberAlias });
+      return reply.status(201).send({
+        roomId: created.id,
+        currentEpoch: created.currentEpoch,
+        nameCiphertext: toBase64(created.nameCiphertext),
+        nameEpoch: created.nameEpoch,
+        precisionPolicy: created.precisionPolicy,
+        approximateRadiusM: created.approximateRadiusM,
+        memberAlias,
+        role: "owner",
+        joinedEpoch: 0,
+      });
     },
   );
 
   server.get(
     "/rooms/:roomId/devices",
-    { onRequest: requireSession, schema: { params: roomIdParamSchema } },
+    {
+      onRequest: requireSession,
+      schema: { params: roomIdParamSchema, response: { 200: roomDevicesResponseSchema } },
+    },
     async (request) => {
       const { roomId } = request.params;
       await requireActiveMembership(roomId, request.userId);
@@ -100,7 +126,14 @@ export function roomRoutes(app: FastifyInstance) {
 
   server.post(
     "/rooms/:roomId/removals",
-    { onRequest: requireSession, schema: { params: roomIdParamSchema, body: removalSchema } },
+    {
+      onRequest: requireSession,
+      schema: {
+        params: roomIdParamSchema,
+        body: removalSchema,
+        response: { 200: rekeyResultSchema },
+      },
+    },
     async (request, reply) => {
       const { roomId } = request.params;
       const body = request.body;

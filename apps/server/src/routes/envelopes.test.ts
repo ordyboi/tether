@@ -37,7 +37,7 @@ describe("GET /envelopes", () => {
     expect(response.statusCode).toBe(200);
     const body = response.json<EnvelopesResponse>();
     expect(body.envelopes).toHaveLength(1);
-    expect(body.envelopes[0]?.roomId).toBe(created.room.id);
+    expect(body.envelopes[0]?.roomId).toBe(created.roomId);
     expect(body.envelopes[0]?.epoch).toBe(0);
     expect(body.envelopes[0]?.wrappedKey).toBe(wrappedKey.toString("base64"));
   });
@@ -83,7 +83,7 @@ describe("GET /envelopes", () => {
 
     const filtered = await app.inject({
       method: "GET",
-      url: `/envelopes?deviceId=${ownerDevice.id}&roomId=${created.room.id}&sinceEpoch=1`,
+      url: `/envelopes?deviceId=${ownerDevice.id}&roomId=${created.roomId}&sinceEpoch=1`,
       headers: { cookie: owner.cookie },
     });
 

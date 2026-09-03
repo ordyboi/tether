@@ -28,6 +28,12 @@ describe("POST /rooms", () => {
     expect(response.statusCode).toBe(201);
     const body = response.json<RoomCreateResponse>();
     expect(typeof body.memberAlias).toBe("string");
+    expect(body.role).toBe("owner");
+    expect(body.joinedEpoch).toBe(0);
+    expect(body).not.toHaveProperty("ownerId");
+    expect(body).not.toHaveProperty("createdAt");
+    expect(body).not.toHaveProperty("updatedAt");
+    expect(body).not.toHaveProperty("room");
   });
 
   it("returns nameCiphertext as base64, matching what the request accepted", async () => {
@@ -49,7 +55,7 @@ describe("POST /rooms", () => {
     });
 
     const body = response.json<RoomCreateResponse>();
-    expect(body.room.nameCiphertext).toBe(nameCiphertext.toString("base64"));
+    expect(body.nameCiphertext).toBe(nameCiphertext.toString("base64"));
   });
 
   it("400s when the envelope set omits one of the owner's devices", async () => {
@@ -94,7 +100,7 @@ describe("GET /rooms", () => {
     app = buildApp();
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
-    await createRoom(app, owner.cookie, ownerDevice.id);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
 
     const other = await createSignedInUser();
 
@@ -109,8 +115,14 @@ describe("GET /rooms", () => {
       headers: { cookie: other.cookie },
     });
 
-    expect(ownerList.json<{ rooms: unknown[] }>().rooms).toHaveLength(1);
+    const rooms = ownerList.json<{ rooms: RoomCreateResponse[] }>().rooms;
+    expect(rooms).toHaveLength(1);
     expect(otherList.json<{ rooms: unknown[] }>().rooms).toHaveLength(0);
+
+    const [listedRoom] = rooms;
+    const createdRoom = created.json<RoomCreateResponse>();
+    expect(listedRoom).not.toHaveProperty("ownerId");
+    expect(Object.keys(listedRoom ?? {}).sort()).toEqual(Object.keys(createdRoom).sort());
   });
 });
 
@@ -120,7 +132,7 @@ describe("GET /rooms/:roomId/devices", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const roomId = created.json<RoomCreateResponse>().room.id;
+    const roomId = created.json<RoomCreateResponse>().roomId;
 
     const response = await app.inject({
       method: "GET",
@@ -143,7 +155,7 @@ describe("GET /rooms/:roomId/devices", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const roomId = created.json<RoomCreateResponse>().room.id;
+    const roomId = created.json<RoomCreateResponse>().roomId;
 
     const stranger = await createSignedInUser();
     const response = await app.inject({
@@ -176,11 +188,11 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room, memberAlias } = created.json<RoomCreateResponse>();
+    const { roomId, memberAlias } = created.json<RoomCreateResponse>();
 
     const response = await app.inject({
       method: "POST",
-      url: `/rooms/${room.id}/removals`,
+      url: `/rooms/${roomId}/removals`,
       headers: { cookie: owner.cookie },
       payload: {
         alias: memberAlias,
@@ -198,11 +210,11 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomCreateResponse>();
 
     const response = await app.inject({
       method: "POST",
-      url: `/rooms/${room.id}/removals`,
+      url: `/rooms/${roomId}/removals`,
       headers: { cookie: owner.cookie },
       payload: {
         alias: "does-not-exist",
@@ -241,12 +253,12 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomCreateResponse>();
 
     const stranger = await createSignedInUser();
     const response = await app.inject({
       method: "POST",
-      url: `/rooms/${room.id}/removals`,
+      url: `/rooms/${roomId}/removals`,
       headers: { cookie: stranger.cookie },
       payload: {
         alias: "someone",
@@ -266,13 +278,13 @@ describe("POST /rooms/:roomId/removals", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = await createRoom(app, owner.cookie, ownerDevice.id);
-    const { room } = created.json<RoomCreateResponse>();
+    const { roomId } = created.json<RoomCreateResponse>();
 
     const token = randomBytes(16).toString("hex");
     const tokenHash = createHash("sha256").update(token).digest("hex");
     await app.inject({
       method: "POST",
-      url: `/rooms/${room.id}/invites`,
+      url: `/rooms/${roomId}/invites`,
       headers: { cookie: owner.cookie },
       payload: {
         tokenHash,
@@ -304,7 +316,7 @@ describe("POST /rooms/:roomId/removals", () => {
 
     await app.inject({
       method: "POST",
-      url: `/rooms/${room.id}/removals`,
+      url: `/rooms/${roomId}/removals`,
       headers: { cookie: owner.cookie },
       payload: {
         alias: joinedAlias,

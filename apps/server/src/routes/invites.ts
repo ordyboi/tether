@@ -2,8 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   inviteCreateSchema,
+  inviteLookupResponseSchema,
   inviteLookupSchema,
   inviteRedeemSchema,
+  inviteResponseSchema,
+  redeemResponseSchema,
   roomIdParamSchema,
 } from "@tether/api";
 import { and, eq, gt, isNull } from "drizzle-orm";
@@ -31,8 +34,27 @@ function liveInviteWhere(tokenHash: string, now: Date) {
   );
 }
 
+// The membership_role column also allows "owner", but inviteCreateSchema never lets a caller
+// grant it — narrow here so the response type matches what invites can actually carry.
+function grantableRole(role: (typeof invite.$inferSelect)["grantsRole"]) {
+  if (role === "owner") {
+    throw new Error("invite grantsRole must never be owner");
+  }
+  return role;
+}
+
 function serializeInvite(row: typeof invite.$inferSelect) {
-  return { ...row, wrappedRoomKey: toBase64(row.wrappedRoomKey) };
+  return {
+    id: row.id,
+    roomId: row.roomId,
+    grantsRole: grantableRole(row.grantsRole),
+    wrappedRoomKey: toBase64(row.wrappedRoomKey),
+    wrappedRoomKeyEpoch: row.wrappedRoomKeyEpoch,
+    createdAt: row.createdAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    redeemedAt: row.redeemedAt?.toISOString() ?? null,
+    revokedAt: row.revokedAt?.toISOString() ?? null,
+  };
 }
 
 export function inviteRoutes(app: FastifyInstance) {
@@ -42,7 +64,11 @@ export function inviteRoutes(app: FastifyInstance) {
     "/rooms/:roomId/invites",
     {
       onRequest: requireSession,
-      schema: { params: roomIdParamSchema, body: inviteCreateSchema },
+      schema: {
+        params: roomIdParamSchema,
+        body: inviteCreateSchema,
+        response: { 201: inviteResponseSchema },
+      },
     },
     async (request, reply) => {
       const { roomId } = request.params;
@@ -85,27 +111,34 @@ export function inviteRoutes(app: FastifyInstance) {
     },
   );
 
-  server.post("/invites/lookup", { schema: { body: inviteLookupSchema } }, async (request) => {
-    const body = request.body;
-    const tokenHash = hashToken(body.token);
+  server.post(
+    "/invites/lookup",
+    { schema: { body: inviteLookupSchema, response: { 200: inviteLookupResponseSchema } } },
+    async (request) => {
+      const body = request.body;
+      const tokenHash = hashToken(body.token);
 
-    const [row] = await db.select().from(invite).where(liveInviteWhere(tokenHash, new Date()));
-    if (!row) {
-      throw new NotFoundError("invite not found");
-    }
+      const [row] = await db.select().from(invite).where(liveInviteWhere(tokenHash, new Date()));
+      if (!row) {
+        throw new NotFoundError("invite not found");
+      }
 
-    return {
-      roomId: row.roomId,
-      grantsRole: row.grantsRole,
-      wrappedRoomKey: toBase64(row.wrappedRoomKey),
-      wrappedRoomKeyEpoch: row.wrappedRoomKeyEpoch,
-      expiresAt: row.expiresAt,
-    };
-  });
+      return {
+        roomId: row.roomId,
+        grantsRole: grantableRole(row.grantsRole),
+        wrappedRoomKey: toBase64(row.wrappedRoomKey),
+        wrappedRoomKeyEpoch: row.wrappedRoomKeyEpoch,
+        expiresAt: row.expiresAt.toISOString(),
+      };
+    },
+  );
 
   server.post(
     "/invites/redeem",
-    { onRequest: requireSession, schema: { body: inviteRedeemSchema } },
+    {
+      onRequest: requireSession,
+      schema: { body: inviteRedeemSchema, response: { 200: redeemResponseSchema } },
+    },
     async (request, reply) => {
       const body = request.body;
       const tokenHash = hashToken(body.token);

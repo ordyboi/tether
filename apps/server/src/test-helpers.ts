@@ -1,15 +1,10 @@
 import { randomBytes } from "node:crypto";
 
+import type { DeviceResponse, RoomSummary } from "@tether/api";
 import type { FastifyInstance } from "fastify";
 
-export interface DeviceResponse {
-  id: string;
-}
-
-export interface RoomCreateResponse {
-  room: { id: string; nameCiphertext: string };
-  memberAlias: string;
-}
+export type { DeviceResponse };
+export type RoomCreateResponse = RoomSummary;
 
 export async function registerDevice(app: FastifyInstance, cookie: string) {
   const response = await app.inject({

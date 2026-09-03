@@ -1,4 +1,4 @@
-import { envelopeQuerySchema } from "@tether/api";
+import { envelopeListResponseSchema, envelopeQuerySchema } from "@tether/api";
 import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -16,7 +16,10 @@ export function envelopeRoutes(app: FastifyInstance) {
 
   server.get(
     "/envelopes",
-    { onRequest: requireSession, schema: { querystring: envelopeQuerySchema } },
+    {
+      onRequest: requireSession,
+      schema: { querystring: envelopeQuerySchema, response: { 200: envelopeListResponseSchema } },
+    },
     async (request) => {
       const query = request.query;
 

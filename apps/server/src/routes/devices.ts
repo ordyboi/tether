@@ -1,4 +1,4 @@
-import { deviceCreateSchema } from "@tether/api";
+import { deviceCreateSchema, deviceResponseSchema } from "@tether/api";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
@@ -10,7 +10,14 @@ import type { ZodTypeProvider } from "../zod-type-provider.js";
 import { fromBase64, toBase64 } from "./bytes.js";
 
 function serializeDevice(row: typeof device.$inferSelect) {
-  return { ...row, identityPublicKey: toBase64(row.identityPublicKey) };
+  return {
+    id: row.id,
+    identityPublicKey: toBase64(row.identityPublicKey),
+    platform: row.platform,
+    createdAt: row.createdAt.toISOString(),
+    lastSeenAt: row.lastSeenAt,
+    revokedAt: row.revokedAt?.toISOString() ?? null,
+  };
 }
 
 export function deviceRoutes(app: FastifyInstance) {
@@ -18,7 +25,13 @@ export function deviceRoutes(app: FastifyInstance) {
 
   server.post(
     "/devices",
-    { onRequest: requireSession, schema: { body: deviceCreateSchema } },
+    {
+      onRequest: requireSession,
+      schema: {
+        body: deviceCreateSchema,
+        response: { 200: deviceResponseSchema, 201: deviceResponseSchema },
+      },
+    },
     async (request, reply) => {
       const body = request.body;
       const identityPublicKey = fromBase64(body.identityPublicKey);
