@@ -5,7 +5,14 @@ import prettierConfig from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.expo/**", "**/expo-env.d.ts"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.expo/**",
+      "**/expo-env.d.ts",
+      "**/.claude/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -17,6 +24,19 @@ export default tseslint.config(
     files: ["apps/server/**/*.ts", "packages/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    },
+  },
+  {
+    files: ["packages/api/src/client/**/*.ts", "packages/api/src/types.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ name: "zod", allowTypeImports: true }],
+          patterns: [{ group: ["**/schemas.js"], allowTypeImports: true }],
+        },
+      ],
     },
   },
   prettierConfig,

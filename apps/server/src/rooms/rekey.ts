@@ -4,7 +4,12 @@ import type { AppDatabase } from "../db/client.js";
 import { device } from "../db/schema/devices.js";
 import { invite, membership } from "../db/schema/membership.js";
 import { room, roomEpoch, roomKeyEnvelope } from "../db/schema/rooms.js";
-import { ConflictError, NotFoundError, StaleEpochError, WrapSetMismatchError } from "../errors.js";
+import {
+  NotFoundError,
+  RoomExistsError,
+  StaleEpochError,
+  WrapSetMismatchError,
+} from "../errors.js";
 
 export type Tx = Parameters<Parameters<AppDatabase["transaction"]>[0]>[0];
 type EpochReason = (typeof roomEpoch.$inferInsert)["reason"];
@@ -132,7 +137,7 @@ export interface CreateRoomParams {
   readonly envelopes: EnvelopeInput[];
 }
 
-const CREATION_EPOCH = 0;
+export const CREATION_EPOCH = 0;
 
 // No room row exists yet to lock, so this skips runRekey's lock-and-compare step.
 export async function createRoom(db: AppDatabase, params: CreateRoomParams) {
@@ -143,7 +148,7 @@ export async function createRoom(db: AppDatabase, params: CreateRoomParams) {
         .from(room)
         .where(eq(room.id, params.roomId));
       if (existing) {
-        throw new ConflictError("roomId already exists");
+        throw new RoomExistsError();
       }
     }
 

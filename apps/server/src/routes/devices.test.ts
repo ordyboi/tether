@@ -30,6 +30,9 @@ describe("POST /devices", () => {
     const body = response.json();
     expect(body.platform).toBe("android");
     expect(body.identityPublicKey).toBe(identityPublicKey);
+    expect(body.userId).toBeUndefined();
+    expect(body.pushToken).toBeUndefined();
+    expect(body.revokedAt).toBeNull();
   });
 
   it("400s an identityPublicKey that is not exactly 32 bytes", async () => {
@@ -66,6 +69,8 @@ describe("POST /devices", () => {
 
     expect(second.statusCode).toBe(200);
     expect(second.json().id).toBe(first.json().id);
+    expect(second.json().userId).toBeUndefined();
+    expect(second.json().pushToken).toBeUndefined();
   });
 
   it("409s when the identityPublicKey belongs to another user", async () => {

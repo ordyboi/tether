@@ -53,9 +53,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run build -w @tether/crypto
+      - run: npm run build -w @tether/api
       - run: npm run lint
       - run: npm run format:check
-      - run: npm run build -w @tether/crypto
       - run: npm run typecheck
       - run: npm run build -w server
       - run: npm run db:push -w server

@@ -1,8 +1,14 @@
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Writable } from "node:stream";
 
+import type { RoomSummary } from "@tether/api";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { buildApp } from "./app.js";
+import { createSignedInUser } from "./auth/session.js";
+import { createRoom, registerDevice } from "./test-helpers.js";
+import type { ZodTypeProvider } from "./zod-type-provider.js";
 
 function captureLogger() {
   const chunks: string[] = [];
@@ -36,5 +42,122 @@ describe("buildApp logging", () => {
 
     expect(output()).not.toContain(clientIp);
     expect(output()).not.toContain(userAgent);
+  });
+});
+
+describe("error handler", () => {
+  it("gives a stale-epoch conflict a { code, message, details } body", async () => {
+    const app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+    const { roomId } = created.json<RoomSummary>();
+
+    const token = randomUUID();
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const inviteResponse = await app.inject({
+      method: "POST",
+      url: `/rooms/${roomId}/invites`,
+      headers: { cookie: owner.cookie },
+      payload: {
+        tokenHash,
+        grantsRole: "member",
+        wrappedRoomKey: randomBytes(48).toString("base64"),
+        wrappedRoomKeyEpoch: 0,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+    expect(inviteResponse.statusCode).toBe(201);
+
+    const joiner = await createSignedInUser();
+    const joinerDevice = await registerDevice(app, joiner.cookie);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/invites/redeem",
+      headers: { cookie: joiner.cookie },
+      payload: {
+        token,
+        displayNameCiphertext: randomBytes(16).toString("base64"),
+        expectedEpoch: 9,
+        nameCiphertext: randomBytes(32).toString("base64"),
+        envelopes: [
+          { deviceId: ownerDevice.id, wrappedKey: randomBytes(48).toString("base64") },
+          { deviceId: joinerDevice.id, wrappedKey: randomBytes(48).toString("base64") },
+        ],
+      },
+    });
+
+    await app.close();
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      code: "stale_epoch",
+      message: "expectedEpoch does not match room.currentEpoch",
+      details: { expectedEpoch: 9, currentEpoch: 0 },
+    });
+  });
+
+  it("500s an unmapped error with { code: internal } and no driver message", async () => {
+    const app = buildApp();
+    app.get("/__boom", () => {
+      throw new Error("secret driver detail");
+    });
+
+    const response = await app.inject({ method: "GET", url: "/__boom" });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    const body = response.json();
+    expect(body).toEqual({ code: "internal", message: "internal server error" });
+  });
+
+  it("500s a handler that returns the wrong shape, without naming response fields", async () => {
+    const app = buildApp();
+    const server = app.withTypeProvider<ZodTypeProvider>();
+    server.get(
+      "/__wrong-shape",
+      { schema: { response: { 200: z.object({ n: z.number() }) } } },
+      // @ts-expect-error deliberately wrong to exercise the serializer's failure path
+      () => ({ n: "not-a-number" }),
+    );
+
+    const response = await app.inject({ method: "GET", url: "/__wrong-shape" });
+    await app.close();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ code: "internal", message: "internal server error" });
+    expect(response.body).not.toContain("expected number");
+    expect(response.body).not.toContain('"n"');
+  });
+});
+
+describe("not found handler", () => {
+  it("gives an unknown route a { code: not_found } body, not fastify's default", async () => {
+    const app = buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/definitely-not-a-route" });
+    await app.close();
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ code: "not_found", message: "not found" });
+  });
+});
+
+describe("the onRoute error-schema hook", () => {
+  it("still round-trips a real JSON body from /api/auth/*", async () => {
+    const app = buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/sign-in/anonymous",
+    });
+
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(typeof body.token).toBe("string");
+    expect(typeof body.user.id).toBe("string");
   });
 });

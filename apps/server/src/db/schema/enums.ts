@@ -16,6 +16,9 @@ export const epochReason = pgEnum("epoch_reason", [
 
 export const membershipRole = pgEnum("membership_role", ["owner", "admin", "member", "guest"]);
 
+// invite.grantsRole is never "owner" — inviteCreateSchema rejects that grant.
+export const grantableRole = pgEnum("grantable_role", ["admin", "member", "guest"]);
+
 export const requestStatus = pgEnum("request_status", [
   "pending",
   "approved",

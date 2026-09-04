@@ -1,7 +1,7 @@
 import { bytea, integer, snakeCase, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "./auth.js";
-import { membershipRole } from "./enums.js";
+import { grantableRole, membershipRole } from "./enums.js";
 import { room } from "./rooms.js";
 
 export const membership = snakeCase.table(
@@ -33,7 +33,7 @@ export const invite = snakeCase.table("invite", {
     .notNull()
     .references(() => room.id),
   tokenHash: text().notNull().unique(),
-  grantsRole: membershipRole().notNull(),
+  grantsRole: grantableRole().notNull(),
   wrappedRoomKey: bytea().notNull(),
   wrappedRoomKeyEpoch: integer().notNull(),
   createdBy: text()
