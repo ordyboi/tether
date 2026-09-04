@@ -17,11 +17,6 @@ function zodFieldErrors(error: ZodError) {
   return error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message }));
 }
 
-// FastifySchema["response"] is typed unknown, so spreading it needs a guard first.
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {}) {
   const app = Fastify({
     logger: {
@@ -47,9 +42,8 @@ export function buildApp(options: { loggerStream?: NodeJS.WritableStream } = {})
   // Fastify falls back to raw JSON.stringify with no 4xx/5xx schema; /api/auth/* sends a plain string.
   app.addHook("onRoute", (routeOptions) => {
     if (routeOptions.url.startsWith("/api/auth")) return;
-    const response = isRecord(routeOptions.schema?.response)
-      ? { ...routeOptions.schema.response }
-      : {};
+    // FastifySchema["response"] is typed unknown; Object.assign accepts that without a cast.
+    const response: Record<string, unknown> = Object.assign({}, routeOptions.schema?.response);
     response["4xx"] ??= errorResponseSchema;
     response["5xx"] ??= errorResponseSchema;
     routeOptions.schema = { ...routeOptions.schema, response };
