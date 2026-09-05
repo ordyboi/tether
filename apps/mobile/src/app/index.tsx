@@ -1,17 +1,29 @@
-import { Text, View, StyleSheet } from "react-native";
+import { Redirect } from "expo-router";
+import { View } from "react-native";
+
+import { Text } from "../components";
+import { useRoom } from "../data/useRoom";
+import { colors } from "../theme";
 
 export default function Index() {
-  return (
-    <View style={styles.container}>
-      <Text>Edit src/app/index.tsx to edit this screen.</Text>
-    </View>
-  );
-}
+  const { room, loading, error } = useRoom();
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+  if (loading || !room) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bg.app,
+        }}
+      >
+        <Text role="body" color={colors.text.secondary}>
+          {error ? error.message : "Setting up your room…"}
+        </Text>
+      </View>
+    );
+  }
+
+  return <Redirect href={{ pathname: "/room/[roomId]", params: { roomId: room.roomId } }} />;
+}
