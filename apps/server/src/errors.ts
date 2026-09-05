@@ -56,6 +56,12 @@ export class RoomExistsError extends HttpError {
   }
 }
 
+export class InviteExistsError extends HttpError {
+  constructor() {
+    super(409, "invite_exists", "invite id already exists");
+  }
+}
+
 export class AlreadyMemberError extends HttpError {
   constructor() {
     super(409, "already_member", "already an active member of this room");

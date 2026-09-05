@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import {
   inviteCreateSchema,
@@ -9,30 +9,17 @@ import {
   redeemResponseSchema,
   roomIdParamSchema,
 } from "@tether/api";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
 import { invite, membership } from "../db/schema/membership.js";
-import { AlreadyMemberError, ForbiddenError, NotFoundError } from "../errors.js";
+import { AlreadyMemberError, ForbiddenError, InviteExistsError, NotFoundError } from "../errors.js";
 import { runRekey } from "../rooms/rekey.js";
 import type { ZodTypeProvider } from "../zod-type-provider.js";
 import { fromBase64, toBase64 } from "./bytes.js";
-
-function hashToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-// Every lookup and redemption must pass the same "unexpired, unredeemed, unrevoked" condition.
-function liveInviteWhere(tokenHash: string, now: Date) {
-  return and(
-    eq(invite.tokenHash, tokenHash),
-    gt(invite.expiresAt, now),
-    isNull(invite.redeemedAt),
-    isNull(invite.revokedAt),
-  );
-}
+import { hashToken, liveInviteWhere } from "./invite-tokens.js";
 
 function serializeInvite(row: typeof invite.$inferSelect) {
   return {
@@ -82,9 +69,20 @@ export function inviteRoutes(app: FastifyInstance) {
         throw new ForbiddenError("only the owner may grant the admin role");
       }
 
+      if (body.id !== undefined) {
+        const [existing] = await db
+          .select({ id: invite.id })
+          .from(invite)
+          .where(eq(invite.id, body.id));
+        if (existing) {
+          throw new InviteExistsError();
+        }
+      }
+
       const [created] = await db
         .insert(invite)
         .values({
+          id: body.id,
           roomId,
           tokenHash: body.tokenHash,
           grantsRole: body.grantsRole,
@@ -115,6 +113,7 @@ export function inviteRoutes(app: FastifyInstance) {
       }
 
       return {
+        id: row.id,
         roomId: row.roomId,
         grantsRole: row.grantsRole,
         wrappedRoomKey: toBase64(row.wrappedRoomKey),

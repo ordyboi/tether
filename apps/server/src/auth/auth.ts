@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { expo } from "@better-auth/expo";
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { anonymous } from "better-auth/plugins";
@@ -97,5 +98,6 @@ export const auth = betterAuth({
       origin: env.PASSKEY_ORIGIN,
     }),
     anonymous(),
+    expo(),
   ],
 });

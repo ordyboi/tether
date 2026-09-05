@@ -31,6 +31,7 @@ describe("POST /rooms", () => {
     expect(typeof body.memberAlias).toBe("string");
     expect(body.role).toBe("owner");
     expect(body.joinedEpoch).toBe(0);
+    expect(body.memberCount).toBe(1);
     expect(body).not.toHaveProperty("ownerId");
     expect(body).not.toHaveProperty("createdAt");
     expect(body).not.toHaveProperty("updatedAt");
@@ -124,6 +125,55 @@ describe("GET /rooms", () => {
     const createdRoom = created.json<RoomSummary>();
     expect(listedRoom).not.toHaveProperty("ownerId");
     expect(Object.keys(listedRoom ?? {}).sort()).toEqual(Object.keys(createdRoom).sort());
+    expect(listedRoom?.memberCount).toBe(1);
+  });
+
+  it("counts an additional active member after they join", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = (await createRoom(app, owner.cookie, ownerDevice.id)).json<RoomSummary>();
+
+    const token = randomBytes(16).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await app.inject({
+      method: "POST",
+      url: `/rooms/${created.roomId}/invites`,
+      headers: { cookie: owner.cookie },
+      payload: {
+        tokenHash,
+        grantsRole: "member",
+        wrappedRoomKey: randomBytes(48).toString("base64"),
+        wrappedRoomKeyEpoch: 0,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const joiner = await createSignedInUser();
+    const joinerDevice = await registerDevice(app, joiner.cookie);
+    await app.inject({
+      method: "POST",
+      url: "/invites/redeem",
+      headers: { cookie: joiner.cookie },
+      payload: {
+        token,
+        displayNameCiphertext: randomBytes(16).toString("base64"),
+        expectedEpoch: 0,
+        nameCiphertext: randomBytes(32).toString("base64"),
+        envelopes: [
+          { deviceId: ownerDevice.id, wrappedKey: randomBytes(48).toString("base64") },
+          { deviceId: joinerDevice.id, wrappedKey: randomBytes(48).toString("base64") },
+        ],
+      },
+    });
+
+    const ownerList = await app.inject({
+      method: "GET",
+      url: "/rooms",
+      headers: { cookie: owner.cookie },
+    });
+    const [ownerRoom] = ownerList.json<{ rooms: RoomSummary[] }>().rooms;
+    expect(ownerRoom?.memberCount).toBe(2);
   });
 });
 
@@ -149,6 +199,72 @@ describe("GET /rooms/:roomId/devices", () => {
     expect(body.epoch).toBe(0);
     expect(body.devices).toHaveLength(1);
     expect(body.devices[0]?.deviceId).toBe(ownerDevice.id);
+  });
+
+  it("allows a non-member holding a live invite for the room", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+    const roomId = created.json<RoomSummary>().roomId;
+
+    const token = randomBytes(16).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await app.inject({
+      method: "POST",
+      url: `/rooms/${roomId}/invites`,
+      headers: { cookie: owner.cookie },
+      payload: {
+        tokenHash,
+        grantsRole: "member",
+        wrappedRoomKey: randomBytes(48).toString("base64"),
+        wrappedRoomKeyEpoch: 0,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const joiner = await createSignedInUser();
+    const response = await app.inject({
+      method: "GET",
+      url: `/rooms/${roomId}/devices?inviteToken=${token}`,
+      headers: { cookie: joiner.cookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("404s a non-member presenting an invite token for a different room", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = await createRoom(app, owner.cookie, ownerDevice.id);
+    const roomId = created.json<RoomSummary>().roomId;
+    const otherRoom = await createRoom(app, owner.cookie, ownerDevice.id);
+    const otherRoomId = otherRoom.json<RoomSummary>().roomId;
+
+    const token = randomBytes(16).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await app.inject({
+      method: "POST",
+      url: `/rooms/${otherRoomId}/invites`,
+      headers: { cookie: owner.cookie },
+      payload: {
+        tokenHash,
+        grantsRole: "member",
+        wrappedRoomKey: randomBytes(48).toString("base64"),
+        wrappedRoomKeyEpoch: 0,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+
+    const joiner = await createSignedInUser();
+    const response = await app.inject({
+      method: "GET",
+      url: `/rooms/${roomId}/devices?inviteToken=${token}`,
+      headers: { cookie: joiner.cookie },
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 
   it("404s for a non-member", async () => {

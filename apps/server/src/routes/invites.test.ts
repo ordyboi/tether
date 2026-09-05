@@ -25,7 +25,7 @@ async function createInvite(
   app: FastifyInstance,
   cookie: string,
   roomId: string,
-  overrides: Partial<{ grantsRole: string; expiresAt: string; tokenHash: string }> = {},
+  overrides: Partial<{ id: string; grantsRole: string; expiresAt: string; tokenHash: string }> = {},
 ) {
   const { token, tokenHash } = tokenAndHash();
   const wrappedRoomKey = randomBytes(48);
@@ -34,6 +34,7 @@ async function createInvite(
     url: `/rooms/${roomId}/invites`,
     headers: { cookie },
     payload: {
+      ...(overrides.id ? { id: overrides.id } : {}),
       tokenHash: overrides.tokenHash ?? tokenHash,
       grantsRole: overrides.grantsRole ?? "member",
       wrappedRoomKey: wrappedRoomKey.toString("base64"),
@@ -41,7 +42,7 @@ async function createInvite(
       expiresAt: overrides.expiresAt ?? new Date(Date.now() + 60_000).toISOString(),
     },
   });
-  return { response, token, wrappedRoomKey };
+  return { response, token, wrappedRoomKey, id: response.json<{ id: string }>().id };
 }
 
 describe("POST /rooms/:roomId/invites", () => {
@@ -91,6 +92,32 @@ describe("POST /rooms/:roomId/invites", () => {
       grantsRole: "owner",
     });
     expect(response.statusCode).toBe(400);
+  });
+
+  it("accepts a client-minted invite id and returns it unchanged", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = (await createRoom(app, owner.cookie, ownerDevice.id)).json<RoomSummary>();
+
+    const id = randomUUID();
+    const { response } = await createInvite(app, owner.cookie, created.roomId, { id });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json<{ id: string }>().id).toBe(id);
+  });
+
+  it("409s a client-supplied invite id that already exists", async () => {
+    app = buildApp();
+    const owner = await createSignedInUser();
+    const ownerDevice = await registerDevice(app, owner.cookie);
+    const created = (await createRoom(app, owner.cookie, ownerDevice.id)).json<RoomSummary>();
+
+    const id = randomUUID();
+    await createInvite(app, owner.cookie, created.roomId, { id });
+
+    const second = await createInvite(app, owner.cookie, created.roomId, { id });
+    expect(second.response.statusCode).toBe(409);
   });
 
   it("400s a tokenHash that is not a 64-character hex digest", async () => {
@@ -144,7 +171,7 @@ describe("POST /invites/lookup", () => {
     const owner = await createSignedInUser();
     const ownerDevice = await registerDevice(app, owner.cookie);
     const created = (await createRoom(app, owner.cookie, ownerDevice.id)).json<RoomSummary>();
-    const { token, wrappedRoomKey } = await createInvite(app, owner.cookie, created.roomId);
+    const { token, wrappedRoomKey, id } = await createInvite(app, owner.cookie, created.roomId);
 
     const response = await app.inject({
       method: "POST",
@@ -153,6 +180,7 @@ describe("POST /invites/lookup", () => {
     });
     expect(response.statusCode).toBe(200);
     const body = response.json<InviteLookupResponse>();
+    expect(body.id).toBe(id);
     expect(body.roomId).toBe(created.roomId);
     expect(body.wrappedRoomKey).toBe(wrappedRoomKey.toString("base64"));
   });

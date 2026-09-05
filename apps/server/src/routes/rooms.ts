@@ -4,24 +4,26 @@ import {
   rekeyResultSchema,
   removalSchema,
   roomCreateSchema,
+  roomDevicesQuerySchema,
   roomDevicesResponseSchema,
   roomIdParamSchema,
   roomListResponseSchema,
   roomSummarySchema,
 } from "@tether/api";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 
 import { requireSession } from "../auth/session.js";
 import { db } from "../db/client.js";
-import { membership } from "../db/schema/membership.js";
+import { invite, membership } from "../db/schema/membership.js";
 import { room } from "../db/schema/rooms.js";
 import { ForbiddenError, NotFoundError } from "../errors.js";
 import { CREATION_EPOCH, createRoom, listActiveDevices, runRekey } from "../rooms/rekey.js";
 import type { ZodTypeProvider } from "../zod-type-provider.js";
 import { fromBase64, toBase64 } from "./bytes.js";
+import { hashToken, liveInviteWhere } from "./invite-tokens.js";
 
-async function requireActiveMembership(roomId: string, userId: string) {
+async function hasActiveMembership(roomId: string, userId: string) {
   const [row] = await db
     .select({ id: membership.id })
     .from(membership)
@@ -32,9 +34,23 @@ async function requireActiveMembership(roomId: string, userId: string) {
         isNull(membership.removedAt),
       ),
     );
-  if (!row) {
-    throw new NotFoundError("room not found");
-  }
+  return row !== undefined;
+}
+
+async function hasLiveInviteForRoom(roomId: string, token: string) {
+  const [row] = await db
+    .select({ id: invite.id })
+    .from(invite)
+    .where(and(eq(invite.roomId, roomId), liveInviteWhere(hashToken(token), new Date())));
+  return row !== undefined;
+}
+
+// A joiner isn't a member yet, but needs the device roster to wrap the rekeyed room key
+// for — a live invite for this room stands in for membership until they redeem it.
+async function requireRoomAccess(roomId: string, userId: string, inviteToken?: string) {
+  if (await hasActiveMembership(roomId, userId)) return;
+  if (inviteToken !== undefined && (await hasLiveInviteForRoom(roomId, inviteToken))) return;
+  throw new NotFoundError("room not found");
 }
 
 export function roomRoutes(app: FastifyInstance) {
@@ -60,8 +76,22 @@ export function roomRoutes(app: FastifyInstance) {
         .innerJoin(room, eq(room.id, membership.roomId))
         .where(and(eq(membership.userId, request.userId), isNull(membership.removedAt)));
 
+      const roomIds = rows.map((row) => row.roomId);
+      const counts = roomIds.length
+        ? await db
+            .select({ roomId: membership.roomId, memberCount: count() })
+            .from(membership)
+            .where(and(inArray(membership.roomId, roomIds), isNull(membership.removedAt)))
+            .groupBy(membership.roomId)
+        : [];
+      const memberCountByRoom = new Map(counts.map((row) => [row.roomId, row.memberCount]));
+
       return {
-        rooms: rows.map((row) => ({ ...row, nameCiphertext: toBase64(row.nameCiphertext) })),
+        rooms: rows.map((row) => ({
+          ...row,
+          nameCiphertext: toBase64(row.nameCiphertext),
+          memberCount: memberCountByRoom.get(row.roomId) ?? 1,
+        })),
       };
     },
   );
@@ -99,6 +129,7 @@ export function roomRoutes(app: FastifyInstance) {
         memberAlias,
         role: "owner",
         joinedEpoch: CREATION_EPOCH,
+        memberCount: 1,
       });
     },
   );
@@ -107,11 +138,15 @@ export function roomRoutes(app: FastifyInstance) {
     "/rooms/:roomId/devices",
     {
       onRequest: requireSession,
-      schema: { params: roomIdParamSchema, response: { 200: roomDevicesResponseSchema } },
+      schema: {
+        params: roomIdParamSchema,
+        querystring: roomDevicesQuerySchema,
+        response: { 200: roomDevicesResponseSchema },
+      },
     },
     async (request) => {
       const { roomId } = request.params;
-      await requireActiveMembership(roomId, request.userId);
+      await requireRoomAccess(roomId, request.userId, request.query.inviteToken);
       const [roomRow] = await db.select().from(room).where(eq(room.id, roomId));
       if (!roomRow) {
         throw new NotFoundError("room not found");

@@ -8,6 +8,7 @@ export const ERROR_CODES = [
   "not_found",
   "stale_epoch",
   "room_exists",
+  "invite_exists",
   "already_member",
   "device_already_registered",
   "internal",

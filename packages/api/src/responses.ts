@@ -19,6 +19,7 @@ export const roomSummarySchema = z.object({
   memberAlias: z.string(),
   role: z.enum(["owner", "admin", "member", "guest"]),
   joinedEpoch: z.number().int().nonnegative(),
+  memberCount: z.number().int().positive(),
 });
 
 export const roomListResponseSchema = z.object({ rooms: z.array(roomSummarySchema) });
@@ -53,6 +54,7 @@ export const inviteResponseSchema = z.object({
 });
 
 export const inviteLookupResponseSchema = z.object({
+  id: z.uuid(),
   roomId: z.uuid(),
   grantsRole: z.enum(["admin", "member", "guest"]),
   wrappedRoomKey: z.base64(),

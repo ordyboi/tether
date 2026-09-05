@@ -75,8 +75,8 @@ export function createTetherClient(options: {
     createDevice: (body: DeviceCreate) => request<DeviceResponse>("POST", "/devices", body),
     listRooms: () => request<RoomListResponse>("GET", "/rooms"),
     createRoom: (body: RoomCreate) => request<RoomSummary>("POST", "/rooms", body),
-    listRoomDevices: (roomId: string) =>
-      request<RoomDevicesResponse>("GET", `/rooms/${roomId}/devices`),
+    listRoomDevices: (roomId: string, params: { inviteToken?: string } = {}) =>
+      request<RoomDevicesResponse>("GET", `/rooms/${roomId}/devices${query(params)}`),
     removeMember: (roomId: string, body: Removal) =>
       request<RekeyResult>("POST", `/rooms/${roomId}/removals`, body),
     listEnvelopes: (queryParams: EnvelopeQuery) =>

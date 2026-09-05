@@ -36,6 +36,8 @@ export const roomCreateSchema = z.object({
 });
 
 export const inviteCreateSchema = z.object({
+  // client-generated: the invite-key-wrap AAD binds inviteId before the row exists server-side.
+  id: z.uuid().optional(),
   tokenHash: z.string().regex(new RegExp(`^[0-9a-f]{${TOKEN_HASH_HEX_LENGTH}}$`)),
   grantsRole: z.enum(["admin", "member", "guest"]),
   wrappedRoomKey: ciphertextBase64,
@@ -55,6 +57,13 @@ export const inviteRedeemSchema = z.object({
   token: z.string().min(1),
   displayNameCiphertext: ciphertextBase64,
   ...rekeyPayloadSchema.shape,
+});
+
+export const roomDevicesQuerySchema = z.object({
+  // Lets a not-yet-a-member joiner, who holds a live invite for this room, look up the
+  // device roster it must wrap the rekeyed room key for — membership alone can't, since
+  // they don't have it yet.
+  inviteToken: z.string().min(1).optional(),
 });
 
 export const envelopeQuerySchema = z.object({
