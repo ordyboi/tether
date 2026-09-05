@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import expoConfig from "eslint-config-expo/flat.js";
 import prettierConfig from "eslint-config-prettier";
+import globals from "globals";
 
 export default tseslint.config(
   {
@@ -19,6 +20,22 @@ export default tseslint.config(
   {
     files: ["apps/mobile/**/*.{ts,tsx}"],
     extends: [expoConfig],
+  },
+  {
+    files: ["apps/mobile/*.config.js", "apps/mobile/jest.setup.js"],
+    languageOptions: { globals: globals.node },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
+    // jest.mock() factories may only reference `mock`-prefixed variables declared
+    // before the module they mock is imported — that ordering trips import/first,
+    // and a lazy require() inside a factory is the standard way to dodge a hoisting
+    // cycle with the real module.
+    files: ["apps/mobile/**/*.test.{ts,tsx}"],
+    rules: {
+      "import/first": "off",
+      "@typescript-eslint/no-require-imports": "off",
+    },
   },
   {
     files: ["apps/server/**/*.ts", "packages/**/*.ts"],
